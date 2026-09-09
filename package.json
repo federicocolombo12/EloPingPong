@@ -3,10 +3,17 @@
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
+    "@expo/vector-icons": "^15.0.2",
+    "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~57.0.20",
+    "expo-haptics": "~57.0.2",
     "expo-status-bar": "~57.0.1",
+    "firebase": "^12.18.0",
     "react": "19.2.3",
-    "react-native": "0.86.3"
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-web": "^0.21.2"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
@@ -16,7 +23,10 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "check": "tsc --noEmit",
+    "test": "tsc src/core/elo.ts src/core/constants.ts src/core/trophies.ts src/core/security.ts src/core/betting.ts src/core/shop.ts src/core/__tests__/elo.test.ts --outDir ./dist_test --module commonjs --target es2022 --skipLibCheck --ignoreConfig && node ./dist_test/__tests__/elo.test.js && rm -rf ./dist_test",
+    "deploy": "EXPO_NO_TELEMETRY=1 expo export -p web && vercel deploy ./dist --prod --yes && vercel alias set dist-lyart-theta-16.vercel.app elopingpong-arena.vercel.app"
   },
   "private": true
 }

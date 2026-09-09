@@ -1,0 +1,56 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper per verificare autenticazione
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper per verificare titolarità utente
+    function isUser(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    // Collezione Leghe (Riunioni Segrete)
+    match /leagues/{leagueId} {
+      // Lettura permessa per membri o ricerca codice
+      allow read: if true;
+      
+      // Creazione permessa a qualsiasi utente autenticato
+      allow create: if isAuthenticated() && request.resource.data.adminUid == request.auth.uid;
+      
+      // Modifica permessa solo se l'utente è l'admin o un membro accreditato della lega
+      allow update: if isAuthenticated() && (
+        resource.data.adminUid == request.auth.uid ||
+        resource.data.members[request.auth.uid] != null
+      );
+      
+      // Cancellazione permessa solo all'admin della lega
+      allow delete: if isAuthenticated() && resource.data.adminUid == request.auth.uid;
+    }
+
+    // Profili pubblici (collezione users)
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if isUser(userId);
+    }
+
+    // Dati privati account (collezione accounts)
+    match /accounts/{email} {
+      allow read, write: if true; // Fallback per autenticazione mock con hash
+    }
+
+    // Segnalazioni e Feedback
+    match /reports/{reportId} {
+      allow create: if true; // Chiunque può inviare segnalazioni
+      allow read: if true;   // Leggibili per gestione AI e admin
+      allow update, delete: if isAuthenticated();
+    }
+
+    // Stanza legacy di default
+    match /rooms/{roomId} {
+      allow read, write: if true;
+    }
+  }
+}
