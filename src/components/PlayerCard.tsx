@@ -78,6 +78,13 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
         </View>
       )}
 
+      {/* Badge Taglia Attiva */}
+      {player.activeBounty && player.activeBounty.amount > 0 && (
+        <View style={styles.bountyBadge}>
+          <Text style={styles.bountyBadgeText}>🎯 TAGLIA: {player.activeBounty.amount} 🪙</Text>
+        </View>
+      )}
+
       {/* Intestazione Riga: Rank + Avatar + Nome + Elo / Race */}
       <View style={styles.topRow}>
         <View style={styles.playerInfo}>
@@ -292,6 +299,24 @@ const styles = StyleSheet.create({
     color: '#000',
     fontSize: 9,
     fontWeight: '900',
+  },
+  bountyBadge: {
+    position: 'absolute',
+    top: 6,
+    left: 10,
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    zIndex: 10,
+    borderWidth: 1,
+    borderColor: '#FFF',
+  },
+  bountyBadgeText: {
+    color: '#FFF',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.3,
   },
   playerName: {
     color: Colors.textPrimary,

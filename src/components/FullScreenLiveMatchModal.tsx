@@ -15,9 +15,10 @@ import {
     View,
 } from 'react-native';
 import { useElo } from '../context/EloContext';
-import { calculateLiveDynamicOdds, calculatePreMatchOdds, canPlacePreMatchBet } from '../core/betting';
+import { calculateAllLiveMarkets, calculateLiveDynamicOdds, calculatePreMatchOdds, canPlacePreMatchBet } from '../core/betting';
+import { getBorderCardStyle } from '../core/shop';
 import { STARTING_COINS } from '../core/constants';
-import { LiveBet, LiveMatchSpecialEvent, MatchComment, MatchLiveStats, Player } from '../core/types';
+import { BetMarketType, LiveBet, LiveMatchSpecialEvent, MatchComment, MatchLiveStats, Player } from '../core/types';
 import { Colors } from '../theme/colors';
 import { soundEffects } from '../utils/soundEffects';
 
@@ -216,6 +217,8 @@ export const FullScreenLiveMatchModal: React.FC<FullScreenLiveMatchModalProps> =
   const [isBetOpen, setIsBetOpen] = useState(false);
   const [betMode, setBetMode] = useState<'pre_match' | 'live_dynamic'>('pre_match');
   const [betTarget, setBetTarget] = useState<1 | 2>(1);
+  const [selectedMarketType, setSelectedMarketType] = useState<BetMarketType>('match_winner');
+  const [selectedSelection, setSelectedSelection] = useState<string>('1');
   const [betAmount, setBetAmount] = useState<number>(25);
   const [isSubmittingBet, setIsSubmittingBet] = useState(false);
 
@@ -388,21 +391,84 @@ export const FullScreenLiveMatchModal: React.FC<FullScreenLiveMatchModalProps> =
   const isP2MatchPoint = !isGameOver && score2 >= targetPoints - 1 && score2 > score1;
 
   // Calcolo Quote e Gestione Riunione Bet (LUL Coins)
-  const activeBets = currentLeague?.activeLiveMatch?.bets || {};
-  const betsList = Object.values(activeBets);
-  const myBets = associatedPlayer ? betsList.filter((b) => b.bettorId === associatedPlayer.id) : [];
+  const isPlayingInMatch = associatedPlayer?.id === player1.id || associatedPlayer?.id === player2.id;
+  const mySide: 1 | 2 = associatedPlayer?.id === player1.id ? 1 : 2;
 
-  const preMatchOdds = calculatePreMatchOdds(player1.elo, player2.elo);
-  const liveDynamicOdds = calculateLiveDynamicOdds(
+  const betsList: LiveBet[] = currentLeague?.activeLiveMatch?.bets
+    ? Object.values(currentLeague.activeLiveMatch.bets)
+    : [];
+  const myBets = React.useMemo(() => {
+    if (!associatedPlayer) return [];
+    return betsList.filter((b) => b.bettorId === associatedPlayer.id);
+  }, [betsList, associatedPlayer]);
+
+  const currentLiveStats: MatchLiveStats = {
+    player1Edges: p1Edges,
+    player2Edges: p2Edges,
+    player1Nets: p1Nets,
+    player2Nets: p2Nets,
+    player1Smashes: p1Smashes,
+    player2Smashes: p2Smashes,
+    player1ServeErrors: p1ServeErrors,
+    player2ServeErrors: p2ServeErrors,
+    player1Aces: p1Aces,
+    player2Aces: p2Aces,
+    player1Defenses: p1Defenses,
+    player2Defenses: p2Defenses,
+    player1StylePoints: p1StylePoints,
+    player2StylePoints: p2StylePoints,
+    player1LuckPoints: p1LuckPoints,
+    player2LuckPoints: p2LuckPoints,
+    player1MatchPointsSaved: p1MatchPointsSaved,
+    player2MatchPointsSaved: p2MatchPointsSaved,
+    player1PointsOnServe: p1PointsOnServe,
+    player2PointsOnServe: p2PointsOnServe,
+    ballContestWinner,
+    player1TotalServes: p1TotalServes,
+    player2TotalServes: p2TotalServes,
+    targetPoints,
+  };
+
+  const allMarkets = React.useMemo(() => {
+    return calculateAllLiveMarkets(
+      player1.name,
+      player2.name,
+      player1.elo,
+      player2.elo,
+      score1,
+      score2,
+      targetPoints,
+      currentLiveStats
+    );
+  }, [
+    player1.name,
+    player2.name,
     player1.elo,
     player2.elo,
     score1,
     score2,
-    targetPoints
-  );
-  const currentOdds = betMode === 'pre_match' ? preMatchOdds : liveDynamicOdds;
-  const selectedOdds = betTarget === 1 ? currentOdds.odds1 : currentOdds.odds2;
-  const potentialWin = Math.round(betAmount * selectedOdds);
+    targetPoints,
+    p1Smashes,
+    p2Smashes,
+    p1Edges,
+    p2Edges,
+    p1Nets,
+    p2Nets,
+  ]);
+
+  const activeMarket =
+    allMarkets.find((m) => m.type === (isPlayingInMatch ? 'match_winner' : selectedMarketType)) ||
+    allMarkets[0];
+  const activeOption =
+    activeMarket.options.find(
+      (o) => o.selection === (isPlayingInMatch ? String(mySide) : selectedSelection)
+    ) || activeMarket.options[0];
+
+  const selectedOdds = activeOption.odds;
+  const hasBooster = !!associatedPlayer?.activeBetBooster;
+  const potentialWin = hasBooster
+    ? Math.round(betAmount + betAmount * (selectedOdds - 1) * 2)
+    : Math.round(betAmount * selectedOdds);
   const isPreMatchOpen = canPlacePreMatchBet(score1, score2);
 
   const handlePlaceBet = async () => {
@@ -426,14 +492,22 @@ export const FullScreenLiveMatchModal: React.FC<FullScreenLiveMatchModalProps> =
 
     setIsSubmittingBet(true);
     try {
-      const res = await placeLiveBet(betTarget, betAmount, betMode);
+      const betTargetSide =
+        activeMarket.type === 'match_winner' ? (activeOption.selection === '2' ? 2 : 1) : 1;
+      const res = await placeLiveBet(betTargetSide, betAmount, betMode, {
+        marketType: activeMarket.type,
+        marketLabel: activeMarket.title,
+        selection: activeOption.selection,
+        selectionLabel: activeOption.label,
+        targetLine: activeMarket.targetLine,
+        odds: activeOption.odds,
+      });
       if (!res.success) {
         const msg = res.error || 'Errore piazzando la scommessa';
         Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Errore Scommessa', msg);
       } else {
         triggerHaptic();
-        const targetName = betTarget === 1 ? player1.name : player2.name;
-        const msg = `Scommessa registrata con successo! ${betAmount} LUL Coins su ${targetName} a quota ${selectedOdds.toFixed(2)}x (Vincita potenziale: ${potentialWin} 🪙)`;
+        const msg = `Scommessa registrata con successo! ${betAmount} LUL Coins su "${activeOption.label}" a quota ${activeOption.odds.toFixed(2)}x (Vincita potenziale: ${potentialWin} 🪙)${hasBooster ? ' ⚡ (Booster 2x Attivo!)' : ''}`;
         Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Bet Piazzata! 🎰', msg);
       }
     } finally {
@@ -1070,6 +1144,7 @@ export const FullScreenLiveMatchModal: React.FC<FullScreenLiveMatchModalProps> =
                 borderWidth: currentServer === 1 ? 2.5 : 1,
                 backgroundColor: currentServer === 1 ? `${p1Color}18` : 'rgba(255, 255, 255, 0.03)',
               },
+              getBorderCardStyle(player1.equippedBorder),
               currentServer === 1 && { borderTopWidth: 4, borderTopColor: p1Color },
               isSmallScreen && { padding: 8 },
             ]}
@@ -1079,6 +1154,11 @@ export const FullScreenLiveMatchModal: React.FC<FullScreenLiveMatchModalProps> =
               <Text style={[styles.playerName, { color: p1Color }, isSmallScreen && { fontSize: 13 }]} numberOfLines={1} ellipsizeMode="tail">
                 {player1.name}
               </Text>
+              {player1.equippedTitle && (
+                <Text style={styles.playerEquippedTitle} numberOfLines={1}>
+                  {player1.equippedTitle}
+                </Text>
+              )}
               {currentServer === 1 && !isGameOver && (
                 <View style={[styles.serverBadge, { backgroundColor: p1Color }]}>
                   <Text style={styles.serverBadgeText}>SERVE 🏓</Text>
@@ -1231,6 +1311,7 @@ export const FullScreenLiveMatchModal: React.FC<FullScreenLiveMatchModalProps> =
                 borderWidth: currentServer === 2 ? 2.5 : 1,
                 backgroundColor: currentServer === 2 ? `${p2Color}18` : 'rgba(255, 255, 255, 0.03)',
               },
+              getBorderCardStyle(player2.equippedBorder),
               currentServer === 2 && { borderTopWidth: 4, borderTopColor: p2Color },
               isSmallScreen && { padding: 8 },
             ]}
@@ -1240,6 +1321,11 @@ export const FullScreenLiveMatchModal: React.FC<FullScreenLiveMatchModalProps> =
               <Text style={[styles.playerName, { color: p2Color }, isSmallScreen && { fontSize: 13 }]} numberOfLines={1} ellipsizeMode="tail">
                 {player2.name}
               </Text>
+              {player2.equippedTitle && (
+                <Text style={styles.playerEquippedTitle} numberOfLines={1}>
+                  {player2.equippedTitle}
+                </Text>
+              )}
               {currentServer === 2 && !isGameOver && (
                 <View style={[styles.serverBadge, { backgroundColor: p2Color }]}>
                   <Text style={styles.serverBadgeText}>SERVE 🏓</Text>
@@ -1476,64 +1562,92 @@ export const FullScreenLiveMatchModal: React.FC<FullScreenLiveMatchModalProps> =
                 </Text>
               </View>
 
-              {/* Quote e Scelta Vincitore */}
-              <View style={styles.oddsContainer}>
-                {/* Sfidante 1 */}
-                <TouchableOpacity
-                  style={[
-                    styles.oddsCard,
-                    betTarget === 1 && { borderColor: p1Color, backgroundColor: `${p1Color}25`, borderWidth: 2 },
-                  ]}
-                  activeOpacity={0.8}
-                  onPress={() => {
-                    soundEffects.playCoinSound();
-                    setBetTarget(1);
-                  }}
-                >
-                  <Text style={styles.oddsAvatar}>{player1.avatar}</Text>
-                  <Text style={[styles.oddsName, { color: p1Color }]} numberOfLines={1}>{player1.name}</Text>
-                  <View style={[styles.oddsBadge, { backgroundColor: p1Color }]}>
-                    <Text style={styles.oddsBadgeMultiplier}>{currentOdds.odds1.toFixed(2)}x</Text>
+              {/* Regola Ferrea Anti-Biscotto vs Selezione Mercati Multipli */}
+              {isPlayingInMatch ? (
+                <View style={styles.antiBiscottoNotice}>
+                  <Text style={styles.antiBiscottoIcon}>🛡️</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.antiBiscottoTitle}>Regola Ferrea Anti-Biscotto</Text>
+                    <Text style={styles.antiBiscottoDesc}>
+                      Sei un giocatore in campo! Puoi scommettere esclusivamente sulla tua vittoria personale.
+                    </Text>
                   </View>
-                  <Text style={styles.oddsProbText}>Prob. {currentOdds.prob1}%</Text>
-                </TouchableOpacity>
-
-                {/* VS */}
-                <View style={styles.oddsVsBox}>
-                  <Text style={styles.oddsVsText}>VS</Text>
                 </View>
+              ) : (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.marketTabsScroll}>
+                  {allMarkets.map((mkt) => {
+                    const isSelected = selectedMarketType === mkt.type;
+                    return (
+                      <TouchableOpacity
+                        key={mkt.type}
+                        onPress={() => {
+                          soundEffects.playButtonTap();
+                          setSelectedMarketType(mkt.type);
+                          setSelectedSelection(mkt.options[0].selection);
+                        }}
+                        style={[styles.multiMarketTab, isSelected && styles.multiMarketTabActive]}
+                      >
+                        <Text style={[styles.multiMarketTabText, isSelected && styles.multiMarketTabTextActive]}>
+                          {mkt.title}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              )}
 
-                {/* Sfidante 2 */}
-                <TouchableOpacity
-                  style={[
-                    styles.oddsCard,
-                    betTarget === 2 && { borderColor: p2Color, backgroundColor: `${p2Color}25`, borderWidth: 2 },
-                  ]}
-                  activeOpacity={0.8}
-                  onPress={() => {
-                    soundEffects.playCoinSound();
-                    setBetTarget(2);
-                  }}
-                >
-                  <Text style={styles.oddsAvatar}>{player2.avatar}</Text>
-                  <Text style={[styles.oddsName, { color: p2Color }]} numberOfLines={1}>{player2.name}</Text>
-                  <View style={[styles.oddsBadge, { backgroundColor: p2Color }]}>
-                    <Text style={styles.oddsBadgeMultiplier}>{currentOdds.odds2.toFixed(2)}x</Text>
-                  </View>
-                  <Text style={styles.oddsProbText}>Prob. {currentOdds.prob2}%</Text>
-                </TouchableOpacity>
+              {/* Opzioni del mercato attivo */}
+              <View style={styles.marketOptionsGrid}>
+                {activeMarket.options.map((opt) => {
+                  const isSelected =
+                    (isPlayingInMatch ? String(mySide) : selectedSelection) === opt.selection;
+                  const isLockedForPlayer = isPlayingInMatch && opt.selection !== String(mySide);
+
+                  return (
+                    <TouchableOpacity
+                      key={opt.selection}
+                      disabled={isLockedForPlayer}
+                      onPress={() => {
+                        soundEffects.playCoinSound();
+                        setSelectedSelection(opt.selection);
+                      }}
+                      style={[
+                        styles.marketOptionCard,
+                        isSelected && styles.marketOptionCardActive,
+                        isLockedForPlayer && { opacity: 0.35 },
+                      ]}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.marketOptionLabel, isSelected && styles.marketOptionLabelActive]}>
+                        {opt.label}
+                      </Text>
+                      <View style={[styles.marketOddsPill, isSelected && styles.marketOddsPillActive]}>
+                        <Text style={[styles.marketOddsPillText, isSelected && styles.marketOddsPillTextActive]}>
+                          {opt.odds.toFixed(2)}x
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
 
               {/* Azione di Puntata */}
               {!isGameOver && (betMode === 'live_dynamic' || isPreMatchOpen) ? (
                 <View style={styles.betActionSection}>
-                  <Text style={styles.betActionTitle}>
-                    Puntata su{' '}
-                    <Text style={{ color: betTarget === 1 ? p1Color : p2Color, fontWeight: '900' }}>
-                      {betTarget === 1 ? player1.name : player2.name}
-                    </Text>{' '}
-                    (Quota {selectedOdds.toFixed(2)}x)
-                  </Text>
+                  <View style={{ marginBottom: 8 }}>
+                    <Text style={styles.betActionTitle}>
+                      Puntata su{' '}
+                      <Text style={{ color: '#FACC15', fontWeight: '900' }}>
+                        {activeOption.label}
+                      </Text>{' '}
+                      (Quota {selectedOdds.toFixed(2)}x)
+                    </Text>
+                    {hasBooster && (
+                      <View style={styles.boosterActiveBadge}>
+                        <Text style={styles.boosterActiveText}>⚡ BOOSTER QUOTA 2X ATTIVO! Profitto netto raddoppiato!</Text>
+                      </View>
+                    )}
+                  </View>
 
                   {/* Chips rapide */}
                   <View style={styles.betChipsRow}>
@@ -1598,12 +1712,12 @@ export const FullScreenLiveMatchModal: React.FC<FullScreenLiveMatchModalProps> =
                 <View style={styles.myBetsSection}>
                   <Text style={styles.myBetsTitle}>✅ Le tue Scommesse in questo match ({myBets.length}):</Text>
                   {myBets.map((b) => {
-                    const targetPlayer = b.betOnPlayer === 1 ? player1 : player2;
+                    const targetLabel = b.selectionLabel || (b.betOnPlayer === 1 ? player1.name : player2.name);
                     return (
                       <View key={b.id} style={styles.myBetCard}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                           <Text style={styles.myBetTargetText}>
-                            {targetPlayer.avatar} {targetPlayer.name} @ <Text style={{ color: '#FACC15', fontWeight: '900' }}>{b.odds.toFixed(2)}x</Text>
+                            🎯 {targetLabel} @ <Text style={{ color: '#FACC15', fontWeight: '900' }}>{b.odds.toFixed(2)}x</Text>
                           </Text>
                           <View style={[styles.myBetTypeBadge, b.type === 'live_dynamic' && { backgroundColor: 'rgba(234, 179, 8, 0.2)' }]}>
                             <Text style={styles.myBetTypeBadgeText}>
@@ -1625,13 +1739,14 @@ export const FullScreenLiveMatchModal: React.FC<FullScreenLiveMatchModalProps> =
                 <View style={styles.allBetsSection}>
                   <Text style={styles.allBetsTitle}>👥 Tutte le Scommesse della Riunione ({betsList.length}):</Text>
                   {betsList.map((b) => {
-                    const targetPlayer = b.betOnPlayer === 1 ? player1 : player2;
+                    const targetLabel = b.selectionLabel || (b.betOnPlayer === 1 ? player1.name : player2.name);
+                    const labelColor = b.betOnPlayer === 1 ? p1Color : b.betOnPlayer === 2 ? p2Color : '#FACC15';
                     return (
                       <View key={b.id} style={styles.spectatorBetRow}>
                         <Text style={styles.spectatorBetAvatar}>{b.bettorAvatar || '🕶️'}</Text>
                         <View style={{ flex: 1 }}>
                           <Text style={styles.spectatorBetText}>
-                            <Text style={{ fontWeight: '800', color: Colors.textPrimary }}>{b.bettorName}</Text> ha puntato <Text style={{ color: '#FACC15', fontWeight: '900' }}>{b.amount} 🪙</Text> su <Text style={{ fontWeight: '800', color: b.betOnPlayer === 1 ? p1Color : p2Color }}>{targetPlayer.name}</Text> @ {b.odds.toFixed(2)}x
+                            <Text style={{ fontWeight: '800', color: Colors.textPrimary }}>{b.bettorName}</Text> ha puntato <Text style={{ color: '#FACC15', fontWeight: '900' }}>{b.amount} 🪙</Text> su <Text style={{ fontWeight: '800', color: labelColor }}>{targetLabel}</Text> @ {b.odds.toFixed(2)}x
                           </Text>
                           <Text style={styles.spectatorBetSub}>
                             {b.type === 'live_dynamic' ? `⚡ Live In-Game (${b.scoreAtBet})` : '🟢 Pre-Match'}
@@ -2618,5 +2733,124 @@ const styles = StyleSheet.create({
   spectatorBetSub: {
     color: Colors.textMuted,
     fontSize: 9.5,
+  },
+  antiBiscottoNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.35)',
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 10,
+  },
+  antiBiscottoIcon: {
+    fontSize: 24,
+  },
+  antiBiscottoTitle: {
+    color: '#EF4444',
+    fontSize: 12,
+    fontWeight: '900',
+    marginBottom: 2,
+  },
+  antiBiscottoDesc: {
+    color: Colors.textSecondary,
+    fontSize: 10.5,
+    lineHeight: 14,
+  },
+  marketTabsScroll: {
+    marginBottom: 10,
+  },
+  multiMarketTab: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    marginRight: 6,
+  },
+  multiMarketTabActive: {
+    backgroundColor: '#38BDF8',
+    borderColor: '#38BDF8',
+  },
+  multiMarketTabText: {
+    color: Colors.textSecondary,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  multiMarketTabTextActive: {
+    color: '#0F172A',
+    fontWeight: '900',
+  },
+  marketOptionsGrid: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  marketOptionCard: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    padding: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  marketOptionCardActive: {
+    borderColor: '#FACC15',
+    backgroundColor: 'rgba(250, 204, 21, 0.12)',
+    borderWidth: 2,
+  },
+  marketOptionLabel: {
+    color: Colors.textPrimary,
+    fontSize: 12,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  marketOptionLabelActive: {
+    color: '#FACC15',
+  },
+  marketOddsPill: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  marketOddsPillActive: {
+    backgroundColor: '#FACC15',
+  },
+  marketOddsPillText: {
+    color: Colors.textSecondary,
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  marketOddsPillTextActive: {
+    color: '#0F172A',
+  },
+  boosterActiveBadge: {
+    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginTop: 4,
+    alignSelf: 'flex-start',
+  },
+  boosterActiveText: {
+    color: '#F59E0B',
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  playerEquippedTitle: {
+    fontSize: 10,
+    color: '#FACC15',
+    fontWeight: '800',
+    marginTop: 1,
+    textAlign: 'center',
   },
 });

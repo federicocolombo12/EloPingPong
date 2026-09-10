@@ -1044,7 +1044,301 @@ class SoundEffectsManager {
         osc.start(noteTime);
         osc.stop(noteTime + 0.46);
       });
+    } catch {
+      // Audio error ignored
+    }
+  }
+
+  /**
+   * 🎮 Final Fantasy VII Victory Fanfare (Procedurale Web Audio)
+   * Il leggendario jingle di vittoria di Nobuo Uematsu (FFVII):
+   * Triplet C5-C5-C5 -> C5 -> Ab4 -> Bb4 -> C5 -> Bb4 -> C5 trionfale con accordo ad ottoni
+   */
+  public playFFVIIVictoryFanfare() {
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    try {
+      const t = ctx.currentTime;
+      // Frequenze note: C5=523.25, Ab4=415.3, Bb4=466.16, G5=783.99, C6=1046.5
+      const notes = [
+        // Triplette iniziali C5
+        { time: 0.0, freq: 523.25, dur: 0.1, vol: 0.35 },
+        { time: 0.11, freq: 523.25, dur: 0.1, vol: 0.35 },
+        { time: 0.22, freq: 523.25, dur: 0.1, vol: 0.35 },
+        // C5 tenuto
+        { time: 0.35, freq: 523.25, dur: 0.25, vol: 0.38 },
+        // Ab4
+        { time: 0.65, freq: 415.3, dur: 0.22, vol: 0.36 },
+        // Bb4
+        { time: 0.9, freq: 466.16, dur: 0.22, vol: 0.38 },
+        // C5
+        { time: 1.15, freq: 523.25, dur: 0.28, vol: 0.4 },
+        // Bb4 (rapida)
+        { time: 1.45, freq: 466.16, dur: 0.12, vol: 0.36 },
+        // C5 Gran Finale (Accordo C Maj: C4 + G4 + C5 + E5 + G5 + C6)
+        { time: 1.6, freq: 523.25, dur: 0.9, vol: 0.42, chord: [261.63, 392.0, 523.25, 659.25, 783.99, 1046.5] },
+      ];
+
+      notes.forEach(({ time, freq, dur, vol, chord }) => {
+        const start = t + time;
+        const freqsToPlay = chord || [freq];
+
+        freqsToPlay.forEach((f) => {
+          // Brass synth (sawtooth + triangle)
+          const osc1 = ctx.createOscillator();
+          const osc2 = ctx.createOscillator();
+          const gain = ctx.createGain();
+          const filter = ctx.createBiquadFilter();
+
+          osc1.type = 'sawtooth';
+          osc1.frequency.setValueAtTime(f, start);
+
+          osc2.type = 'triangle';
+          osc2.frequency.setValueAtTime(f * 1.002, start); // micro chorus
+
+          filter.type = 'lowpass';
+          filter.frequency.setValueAtTime(3200, start);
+          filter.frequency.exponentialRampToValueAtTime(1400, start + dur);
+
+          // Vibrato for long final chord
+          if (dur > 0.5) {
+            const vib = ctx.createOscillator();
+            const vibGain = ctx.createGain();
+            vib.frequency.setValueAtTime(6.0, start);
+            vibGain.gain.setValueAtTime(f * 0.015, start);
+            vib.connect(osc1.frequency);
+            vib.connect(osc2.frequency);
+            vib.start(start + 0.2);
+            vib.stop(start + dur);
+          }
+
+          const individualVol = vol / Math.sqrt(freqsToPlay.length);
+          gain.gain.setValueAtTime(individualVol, start);
+          gain.gain.setValueAtTime(individualVol * 0.85, start + dur * 0.7);
+          gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+
+          osc1.connect(filter);
+          osc2.connect(filter);
+          filter.connect(gain);
+          gain.connect(ctx.destination);
+
+          osc1.start(start);
+          osc2.start(start);
+          osc1.stop(start + dur);
+          osc2.stop(start + dur);
+        });
+      });
     } catch {}
+  }
+
+  /**
+   * 🎸 Rock Anthem: Riff aggressivo di chitarra elettrica distorta
+   */
+  public playRockRiff() {
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    try {
+      const t = ctx.currentTime;
+      const chords = [
+        { time: 0.0, freqs: [164.81, 246.94, 329.63], dur: 0.18 }, // E power chord
+        { time: 0.2, freqs: [164.81, 246.94, 329.63], dur: 0.15 },
+        { time: 0.4, freqs: [196.0, 293.66, 392.0], dur: 0.2 },   // G power chord
+        { time: 0.65, freqs: [220.0, 330.0, 440.0], dur: 0.5 },   // A power chord finale
+      ];
+
+      chords.forEach(({ time, freqs, dur }) => {
+        const start = t + time;
+        freqs.forEach((f) => {
+          const osc = ctx.createOscillator();
+          const shaper = ctx.createWaveShaper();
+          const gain = ctx.createGain();
+
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(f, start);
+
+          shaper.curve = this.getDistortionCurve(30) as any;
+
+          gain.gain.setValueAtTime(0.18, start);
+          gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+
+          osc.connect(shaper);
+          shaper.connect(gain);
+          gain.connect(ctx.destination);
+
+          osc.start(start);
+          osc.stop(start + dur);
+        });
+      });
+    } catch {}
+  }
+
+  /**
+   * ⚡ Techno Anthem: Drop rave elettronico con sub kick e synth bass
+   */
+  public playTechnoDrop() {
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    try {
+      const t = ctx.currentTime;
+      // 4 cassa dritta kicks + synth bassline
+      for (let i = 0; i < 4; i++) {
+        const kickTime = t + i * 0.22;
+        const kickOsc = ctx.createOscillator();
+        const kickGain = ctx.createGain();
+
+        kickOsc.type = 'sine';
+        kickOsc.frequency.setValueAtTime(160, kickTime);
+        kickOsc.frequency.exponentialRampToValueAtTime(45, kickTime + 0.18);
+
+        kickGain.gain.setValueAtTime(0.6, kickTime);
+        kickGain.gain.exponentialRampToValueAtTime(0.001, kickTime + 0.2);
+
+        kickOsc.connect(kickGain);
+        kickGain.connect(ctx.destination);
+
+        kickOsc.start(kickTime);
+        kickOsc.stop(kickTime + 0.2);
+
+        // Synth offbeat chirp
+        const bassOsc = ctx.createOscillator();
+        const bassGain = ctx.createGain();
+        const bassFilter = ctx.createBiquadFilter();
+        const bassTime = kickTime + 0.11;
+
+        bassOsc.type = 'sawtooth';
+        bassOsc.frequency.setValueAtTime(110 * (1 + (i % 2) * 0.33), bassTime);
+
+        bassFilter.type = 'lowpass';
+        bassFilter.frequency.setValueAtTime(1800, bassTime);
+        bassFilter.frequency.exponentialRampToValueAtTime(300, bassTime + 0.1);
+
+        bassGain.gain.setValueAtTime(0.25, bassTime);
+        bassGain.gain.exponentialRampToValueAtTime(0.001, bassTime + 0.11);
+
+        bassOsc.connect(bassFilter);
+        bassFilter.connect(bassGain);
+        bassGain.connect(ctx.destination);
+
+        bassOsc.start(bassTime);
+        bassOsc.stop(bassTime + 0.11);
+      }
+    } catch {}
+  }
+
+  /**
+   * 🏟️ Stadium Anthem: Boato dello stadio con trombetta da stadio da festa
+   */
+  public playStadiumCheer() {
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    try {
+      const t = ctx.currentTime;
+
+      // Horn rhythm: Da-da-da-da-da-daaaa
+      const hornNotes = [
+        { time: 0.0, dur: 0.12, freq: 440 },
+        { time: 0.14, dur: 0.12, freq: 440 },
+        { time: 0.28, dur: 0.12, freq: 440 },
+        { time: 0.42, dur: 0.18, freq: 554.37 }, // C#5
+        { time: 0.62, dur: 0.18, freq: 440 },
+        { time: 0.82, dur: 0.45, freq: 659.25 }, // E5
+      ];
+
+      hornNotes.forEach(({ time, dur, freq }) => {
+        const start = t + time;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(freq, start);
+
+        gain.gain.setValueAtTime(0.25, start);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(start);
+        osc.stop(start + dur);
+      });
+
+      // Crowd applause / noise swell
+      const crowd = ctx.createBufferSource();
+      crowd.buffer = this.getNoiseBuffer(ctx);
+      const crowdFilter = ctx.createBiquadFilter();
+      crowdFilter.type = 'bandpass';
+      crowdFilter.frequency.setValueAtTime(1600, t + 0.3);
+      crowdFilter.Q.setValueAtTime(1.5, t + 0.3);
+
+      const crowdGain = ctx.createGain();
+      crowdGain.gain.setValueAtTime(0.01, t);
+      crowdGain.gain.linearRampToValueAtTime(0.2, t + 0.8);
+      crowdGain.gain.exponentialRampToValueAtTime(0.001, t + 1.4);
+
+      crowd.connect(crowdFilter);
+      crowdFilter.connect(crowdGain);
+      crowdGain.connect(ctx.destination);
+
+      crowd.start(t);
+      crowd.stop(t + 1.4);
+    } catch {}
+  }
+
+  /**
+   * 🎡 Wheel Tick: Scatto meccanico della ruota della fortuna quando tocca un perno
+   */
+  public playWheelTick() {
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    try {
+      const t = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(920, t);
+      osc.frequency.exponentialRampToValueAtTime(260, t + 0.015);
+
+      gain.gain.setValueAtTime(0.12, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.018);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(t);
+      osc.stop(t + 0.02);
+    } catch {}
+  }
+
+  /**
+   * Suona l'inno di vittoria equipaggiato dal giocatore
+   */
+  public playAnthem(soundId?: string) {
+    if (!soundId || soundId === 'sound_default') {
+      this.playVictoryFanfare();
+      return;
+    }
+    switch (soundId) {
+      case 'sound_ff7_fanfare':
+        this.playFFVIIVictoryFanfare();
+        break;
+      case 'sound_rock':
+        this.playRockRiff();
+        break;
+      case 'sound_techno':
+        this.playTechnoDrop();
+        break;
+      case 'sound_stadium':
+        this.playStadiumCheer();
+        break;
+      default:
+        this.playVictoryFanfare();
+        break;
+    }
   }
 }
 

@@ -9,11 +9,13 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { AVAILABLE_EMOJIS, AVAILABLE_TAGS } from '../core/constants';
+import { AVAILABLE_EMOJIS } from '../core/constants';
 import { Player } from '../core/types';
 import { Colors } from '../theme/colors';
 import { GifPickerModal } from './GifPickerModal';
 import { useElo } from '../context/EloContext';
+import { SHOP_ITEMS } from '../core/shop';
+import { ACHIEVEMENTS } from '../core/achievements';
 
 interface EditPlayerModalProps {
   player: Player | null;
@@ -70,6 +72,53 @@ export const EditPlayerModal: React.FC<EditPlayerModalProps> = ({
       setProfileBanner(player.profileBanner || '');
     }
   }, [player]);
+
+  const ownedRecognitions = React.useMemo(() => {
+    if (!player) return [];
+    const list: { id: string; label: string; icon: string; type: 'title' | 'trophy' | 'achievement' }[] = [];
+
+    // Titoli acquistati al Bazar
+    SHOP_ITEMS.filter((it) => it.category === 'title' && player.inventory?.includes(it.id)).forEach((it) => {
+      list.push({ id: it.id, label: it.name, icon: it.icon, type: 'title' });
+    });
+
+    // Trofei/Cimeli acquistati
+    SHOP_ITEMS.filter((it) => it.category === 'trophy' && (player.trophyShowcase?.includes(it.id) || player.inventory?.includes(it.id))).forEach((it) => {
+      list.push({ id: it.id, label: it.trophyBadge || it.name, icon: it.icon, type: 'trophy' });
+    });
+
+    // Badge speciali vinti (es. Pacco Sorpresa)
+    if (player.tags?.includes('📦 Spacchettatore Seriale')) {
+      list.push({ id: 'badge_box', label: '📦 Spacchettatore Seriale', icon: '📦', type: 'achievement' });
+    }
+
+    // Achievement riscattati dal giocatore
+    if (player.claimedAchievements) {
+      Object.entries(player.claimedAchievements).forEach(([achId, tierLevel]) => {
+        const ach = ACHIEVEMENTS.find((a) => a.id === achId);
+        const tier = ach?.tiers.find((t) => t.level === tierLevel);
+        if (ach && tier) {
+          list.push({
+            id: `ach_${achId}_${tierLevel}`,
+            label: `${tier.badge} ${ach.name} (${tier.name})`,
+            icon: tier.badge,
+            type: 'achievement',
+          });
+        }
+      });
+    }
+
+    // Mantieni eventuali tag già salvati sul profilo del giocatore
+    player.tags?.forEach((tag) => {
+      if (!list.some((item) => item.label === tag)) {
+        list.push({ id: tag, label: tag, icon: '🏷️', type: 'achievement' });
+      }
+    });
+
+    return list;
+  }, [player]);
+
+  const hasCustomNicknamePerk = player.inventory?.includes('perk_custom_nickname') || isAdmin;
 
   const toggleTag = (tagStr: string) => {
     if (selectedTags.includes(tagStr)) {
@@ -274,24 +323,36 @@ export const EditPlayerModal: React.FC<EditPlayerModalProps> = ({
               </View>
             )}
 
-            {/* Tag / Badge Personali */}
-            <Text style={styles.label}>Scegli tra i Titoli Ufficiali</Text>
-            <View style={styles.tagsContainer}>
-              {AVAILABLE_TAGS.map((tag) => {
-                const isSelected = selectedTags.includes(tag);
-                return (
-                  <TouchableOpacity
-                    key={tag}
-                    onPress={() => toggleTag(tag)}
-                    style={[styles.tagPill, isSelected && styles.tagPillSelected]}
-                  >
-                    <Text style={[styles.tagPillText, isSelected && styles.tagPillTextSelected]}>
-                      {tag}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+            {/* Titoli & Trofei Meritocratici (Sbloccati / Acquistati) */}
+            <Text style={styles.label}>Titoli & Trofei Meritocratici</Text>
+            {ownedRecognitions.length === 0 ? (
+              <View style={styles.emptyRecognitionsBox}>
+                <Text style={styles.emptyRecognitionsIcon}>🔒</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.emptyRecognitionsTitle}>Nessun titolo sbloccato</Text>
+                  <Text style={styles.emptyRecognitionsText}>
+                    Conquista achievement nei match o acquista titoli al Bazar per poterli equipaggiare qui!
+                  </Text>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.tagsContainer}>
+                {ownedRecognitions.map((rec) => {
+                  const isSelected = selectedTags.includes(rec.label);
+                  return (
+                    <TouchableOpacity
+                      key={rec.id}
+                      onPress={() => toggleTag(rec.label)}
+                      style={[styles.tagPill, isSelected && styles.tagPillSelected]}
+                    >
+                      <Text style={[styles.tagPillText, isSelected && styles.tagPillTextSelected]}>
+                        {rec.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
 
             {/* Tag Personalizzati della Lega */}
             <Text style={styles.label}>Tag Personalizzati della Lega</Text>
@@ -315,51 +376,67 @@ export const EditPlayerModal: React.FC<EditPlayerModalProps> = ({
                           {fullStr}
                         </Text>
                       </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => handleDeleteCustomTag(cTag.id, fullStr)}
-                        style={styles.deleteTagBtn}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      >
-                        <Text style={styles.deleteTagBtnText}>✕</Text>
-                      </TouchableOpacity>
+                      {isAdmin && (
+                        <TouchableOpacity
+                          onPress={() => handleDeleteCustomTag(cTag.id, fullStr)}
+                          style={styles.deleteTagBtn}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Text style={styles.deleteTagBtnText}>✕</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
                   );
                 })}
               </View>
             )}
 
-            {/* Crea & Aggiungi Nuovo Tag alla Lega */}
-            <Text style={styles.label}>Crea Nuovo Tag con Emoji</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tagEmojiScroll}>
-              {TAG_QUICK_EMOJIS.map((em) => (
-                <TouchableOpacity
-                  key={em}
-                  onPress={() => setSelectedTagEmoji(em)}
-                  style={[
-                    styles.tagEmojiBtn,
-                    selectedTagEmoji === em && styles.tagEmojiBtnSelected,
-                  ]}
-                >
-                  <Text style={styles.tagEmojiText}>{em}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            {/* Crea & Aggiungi Nuovo Tag alla Lega (Gated by Perk) */}
+            <Text style={styles.label}>Conio Soprannome Personale</Text>
+            {hasCustomNicknamePerk ? (
+              <>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tagEmojiScroll}>
+                  {TAG_QUICK_EMOJIS.map((em) => (
+                    <TouchableOpacity
+                      key={em}
+                      onPress={() => setSelectedTagEmoji(em)}
+                      style={[
+                        styles.tagEmojiBtn,
+                        selectedTagEmoji === em && styles.tagEmojiBtnSelected,
+                      ]}
+                    >
+                      <Text style={styles.tagEmojiText}>{em}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
 
-            <View style={styles.customTagRow}>
-              <View style={styles.tagEmojiPrefix}>
-                <Text style={styles.tagEmojiPrefixText}>{selectedTagEmoji}</Text>
+                <View style={styles.customTagRow}>
+                  <View style={styles.tagEmojiPrefix}>
+                    <Text style={styles.tagEmojiPrefixText}>{selectedTagEmoji}</Text>
+                  </View>
+                  <TextInput
+                    style={[styles.input, { flex: 1, marginBottom: 0 }]}
+                    value={customTagInput}
+                    onChangeText={setCustomTagInput}
+                    placeholder="Es. Sfonda Retine, Il Terrore..."
+                    placeholderTextColor={Colors.textMuted}
+                  />
+                  <TouchableOpacity onPress={handleAddNewTag} style={styles.addTagBtn}>
+                    <Text style={styles.addTagBtnText}>+ Conia</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              <View style={styles.lockedPerkBox}>
+                <Text style={styles.lockedPerkIcon}>🏷️</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.lockedPerkTitle}>Conio Soprannome Bloccato</Text>
+                  <Text style={styles.lockedPerkText}>
+                    Per coniare un soprannome speciale personalizzato, acquista il "🏷️ Conio Soprannome" al Bazar (50 🪙)!
+                  </Text>
+                </View>
               </View>
-              <TextInput
-                style={[styles.input, { flex: 1, marginBottom: 0 }]}
-                value={customTagInput}
-                onChangeText={setCustomTagInput}
-                placeholder="Es. Sfonda Retine, Mano di Gesso..."
-                placeholderTextColor={Colors.textMuted}
-              />
-              <TouchableOpacity onPress={handleAddNewTag} style={styles.addTagBtn}>
-                <Text style={styles.addTagBtnText}>+ Aggiungi Tag</Text>
-              </TouchableOpacity>
-            </View>
+            )}
           </ScrollView>
 
           {/* Footer */}
@@ -768,5 +845,55 @@ const styles = StyleSheet.create({
     color: Colors.textDark,
     fontSize: 14,
     fontWeight: '900',
+  },
+  emptyRecognitionsBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+  },
+  emptyRecognitionsIcon: {
+    fontSize: 24,
+  },
+  emptyRecognitionsTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    marginBottom: 2,
+  },
+  emptyRecognitionsText: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    lineHeight: 15,
+  },
+  lockedPerkBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: 'rgba(245, 158, 11, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.25)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+  },
+  lockedPerkIcon: {
+    fontSize: 24,
+  },
+  lockedPerkTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#F59E0B',
+    marginBottom: 2,
+  },
+  lockedPerkText: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    lineHeight: 15,
   },
 });

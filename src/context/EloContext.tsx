@@ -26,8 +26,10 @@ import {
   canPlacePreMatchBet,
   handleBilateralBetRule,
   resolveMatchBets,
+  validateBetPlacement,
 } from '../core/betting';
-import { openMysteryBox, SHOP_ITEMS } from '../core/shop';
+import { openMysteryBox, SHOP_ITEMS, spinLuckyWheel, WheelSpinOutcome } from '../core/shop';
+import { calculatePlayerAchievements } from '../core/achievements';
 import { soundEffects } from '../utils/soundEffects';
 import { isFirebaseConfigured } from '../core/firebaseConfig';
 import {
@@ -75,6 +77,7 @@ import {
     MatchComment,
     MatchLiveStats,
     Player,
+    PlayerBounty,
     Season,
     SeasonPodium,
 } from '../core/types';
@@ -185,14 +188,26 @@ interface EloContextType {
   placeLiveBet: (
     betOnPlayer: 1 | 2,
     amount: number,
-    type: 'pre_match' | 'live_dynamic'
+    type: 'pre_match' | 'live_dynamic',
+    marketOptions?: {
+      marketType?: import('../core/types').BetMarketType;
+      marketLabel?: string;
+      selection?: string;
+      selectionLabel?: string;
+      targetLine?: number;
+      odds?: number;
+    }
   ) => Promise<{ success: boolean; error?: string }>;
   claimBailout: () => Promise<{ success: boolean; error?: string }>;
+  claimDailyReward: () => Promise<{ success: boolean; error?: string; coinsAdded?: number }>;
+  spinWheel: () => Promise<{ success: boolean; error?: string; outcome?: WheelSpinOutcome; isFree?: boolean }>;
   resetAllCoins: () => Promise<{ success: boolean; error?: string }>;
+  claimAchievement: (achievementId: string) => Promise<{ success: boolean; error?: string; coinsAwarded?: number }>;
+  placeBounty: (targetPlayerId: string, amount: number) => Promise<{ success: boolean; error?: string }>;
 
   // Bazar Shop
   purchaseShopItem: (itemId: string) => Promise<{ success: boolean; error?: string; mysteryOutcome?: any }>;
-  equipPlayerItem: (itemType: 'title' | 'border', itemId: string | null) => Promise<{ success: boolean; error?: string }>;
+  equipPlayerItem: (itemType: 'title' | 'border' | 'sound', itemId: string | null) => Promise<{ success: boolean; error?: string }>;
 }
 
 const EloContext = createContext<EloContextType | undefined>(undefined);
@@ -971,7 +986,15 @@ export const EloProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const placeLiveBet = async (
     betOnPlayer: 1 | 2,
     amount: number,
-    type: 'pre_match' | 'live_dynamic'
+    type: 'pre_match' | 'live_dynamic',
+    marketOptions?: {
+      marketType?: import('../core/types').BetMarketType;
+      marketLabel?: string;
+      selection?: string;
+      selectionLabel?: string;
+      targetLine?: number;
+      odds?: number;
+    }
   ): Promise<{ success: boolean; error?: string }> => {
     if (!associatedPlayer) {
       return { success: false, error: 'Devi collegare il tuo profilo giocatore per scommettere!' };
@@ -986,18 +1009,34 @@ export const EloProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (type === 'pre_match' && !canPlacePreMatchBet(live.score1, live.score2)) {
       return { success: false, error: 'Le scommesse Pre-Match sono chiuse (oltre il 5° punto). Usa la scommessa Live Dinamica!' };
     }
-    // Anti-biscotto: un giocatore in campo può scommettere solo sulla propria vittoria
-    if (live.player1Id === associatedPlayer.id && betOnPlayer === 2) {
-      return { success: false, error: 'Non puoi scommettere contro te stesso!' };
-    }
-    if (live.player2Id === associatedPlayer.id && betOnPlayer === 1) {
-      return { success: false, error: 'Non puoi scommettere contro te stesso!' };
+
+    const marketType = marketOptions?.marketType || 'match_winner';
+
+    // Regola Ferrea Anti-Biscotto: chi gioca può scommettere solo sulla propria vittoria
+    const validation = validateBetPlacement(
+      associatedPlayer.id,
+      live.player1Id,
+      live.player2Id,
+      marketType,
+      betOnPlayer
+    );
+    if (!validation.valid) {
+      return { success: false, error: validation.error };
     }
 
     const currentCoins = associatedPlayer.coins !== undefined ? associatedPlayer.coins : STARTING_COINS;
 
-    // Gestione regola bilaterale / No-Hedging (azzeramento o cancellazione scommessa sul giocatore opposto)
-    const bilateral = handleBilateralBetRule(live.bets, associatedPlayer.id, betOnPlayer, amount);
+    // Gestione regola bilaterale / No-Hedging solo per il mercato vincitore match
+    let bilateral = {
+      updatedBets: live.bets || {},
+      refundedCoins: 0,
+      positionZeroed: false,
+    };
+
+    if (marketType === 'match_winner') {
+      bilateral = handleBilateralBetRule(live.bets, associatedPlayer.id, betOnPlayer, amount);
+    }
+
     let workingCoins = currentCoins + bilateral.refundedCoins;
 
     if (bilateral.positionZeroed) {
@@ -1048,22 +1087,38 @@ export const EloProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ? calculatePreMatchOdds(p1?.elo || 1200, p2?.elo || 1200)
         : calculateLiveDynamicOdds(p1?.elo || 1200, p2?.elo || 1200, live.score1, live.score2, targetPoints);
 
-    const lockedOdds = betOnPlayer === 1 ? oddsCalc.odds1 : oddsCalc.odds2;
-    const potentialPayout = Math.round(amount * lockedOdds);
+    const lockedOdds = marketOptions?.odds ?? (betOnPlayer === 1 ? oddsCalc.odds1 : oddsCalc.odds2);
+    const hasBooster = !!associatedPlayer.activeBetBooster;
+    const netProfit = amount * (lockedOdds - 1);
+    const potentialPayout = hasBooster
+      ? Math.round(amount + netProfit * 2)
+      : Math.round(amount * lockedOdds);
+
+    const selection = marketOptions?.selection || String(betOnPlayer);
+    const selectionLabel =
+      marketOptions?.selectionLabel ||
+      (marketType === 'match_winner' ? (betOnPlayer === 1 ? (p1?.name || 'P1') : (p2?.name || 'P2')) : selection);
+    const marketLabel = marketOptions?.marketLabel || (marketType === 'match_winner' ? 'Vincitore Match' : marketType);
 
     const newBet: LiveBet = {
       id: `bet_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       type,
+      marketType,
+      marketLabel,
       bettorId: associatedPlayer.id,
       bettorName: associatedPlayer.name,
       bettorAvatar: associatedPlayer.avatar,
-      betOnPlayer,
+      betOnPlayer: marketType === 'match_winner' ? betOnPlayer : undefined,
+      selection,
+      selectionLabel,
+      targetLine: marketOptions?.targetLine,
       amount,
       odds: lockedOdds,
       scoreAtBet: type === 'pre_match' ? 'Pre-match' : `${live.score1} - ${live.score2}`,
       potentialPayout,
       status: 'pending',
       timestamp: Date.now(),
+      usedBooster: hasBooster,
     };
 
     // Scala i gettoni dal giocatore
@@ -1095,6 +1150,11 @@ export const EloProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await syncLeagueToCloud(updatedLeague);
 
     soundEffects.playCoinSound();
+    setToastNotification({
+      title: '🪙 Scommessa Piazzata!',
+      message: `${amount} 🪙 su "${selectionLabel}" a quota ${lockedOdds.toFixed(2)}x ${hasBooster ? '⚡ (Booster 2x Attivo!)' : ''}`,
+    });
+
     return { success: true };
   };
 
@@ -1171,6 +1231,227 @@ export const EloProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true };
   };
 
+  const claimDailyReward = async (): Promise<{ success: boolean; error?: string; coinsAdded?: number }> => {
+    if (!associatedPlayer) {
+      return { success: false, error: 'Devi collegare il tuo profilo giocatore per riscuotere il sussidio giornaliero!' };
+    }
+    const now = Date.now();
+    const lastClaim = associatedPlayer.lastDailyRewardAt || 0;
+    const cooldownMs = 24 * 60 * 60 * 1000;
+    if (now - lastClaim < cooldownMs) {
+      const remainingHours = Math.ceil((cooldownMs - (now - lastClaim)) / (1000 * 60 * 60));
+      return { success: false, error: `Sussidio giornaliero già riscosso! Torna tra circa ${remainingHours} ore.` };
+    }
+
+    const currentCoins = associatedPlayer.coins !== undefined ? associatedPlayer.coins : STARTING_COINS;
+    const reward = 50;
+    const updatedPlayers = players.map((p) => {
+      if (p.id === associatedPlayer.id) {
+        return {
+          ...p,
+          coins: currentCoins + reward,
+          lastDailyRewardAt: now,
+        };
+      }
+      return p;
+    });
+
+    setPlayers(updatedPlayers);
+    await savePlayers(updatedPlayers);
+    if (currentLeague) {
+      const updatedLeague: League = {
+        ...currentLeague,
+        players: updatedPlayers,
+      };
+      setCurrentLeague(updatedLeague);
+      await syncLeagueToCloud(updatedLeague);
+    }
+
+    soundEffects.playCoinSound();
+    setToastNotification({
+      title: '🎁 Sussidio Giornaliero Riscattato!',
+      message: `Hai ricevuto +${reward} LUL Coins! Torna domani per il prossimo riscatto.`,
+    });
+    return { success: true, coinsAdded: reward };
+  };
+
+  const spinWheel = async (): Promise<{ success: boolean; error?: string; outcome?: WheelSpinOutcome; isFree?: boolean }> => {
+    if (!associatedPlayer) {
+      return { success: false, error: 'Collega il tuo profilo per girare la Ruota della Fortuna!' };
+    }
+    const now = Date.now();
+    const lastSpin = associatedPlayer.lastDailySpinAt || 0;
+    const cooldownMs = 24 * 60 * 60 * 1000;
+    const isFree = !associatedPlayer.lastDailySpinAt || (now - lastSpin >= cooldownMs);
+    const cost = isFree ? 0 : 50;
+
+    const currentCoins = associatedPlayer.coins !== undefined ? associatedPlayer.coins : STARTING_COINS;
+    if (!isFree && currentCoins < cost) {
+      return { success: false, error: `Saldo insufficiente! Un giro extra costa 50 🪙 (Saldo attuale: ${currentCoins} 🪙)` };
+    }
+
+    const outcome = spinLuckyWheel();
+    let coinsAfter = currentCoins - cost + (outcome.sector.coins || 0);
+    let newBetBooster = associatedPlayer.activeBetBooster;
+    let newInsurance = associatedPlayer.hasBetInsurance;
+
+    if (outcome.sector.perkId === 'perk_bet_booster') {
+      newBetBooster = true;
+    } else if (outcome.sector.perkId === 'perk_insurance') {
+      newInsurance = true;
+    }
+
+    const updatedPlayers = players.map((p) => {
+      if (p.id === associatedPlayer.id) {
+        return {
+          ...p,
+          coins: coinsAfter,
+          activeBetBooster: newBetBooster,
+          hasBetInsurance: newInsurance,
+          lastDailySpinAt: isFree ? now : p.lastDailySpinAt,
+        };
+      }
+      return p;
+    });
+
+    setPlayers(updatedPlayers);
+    await savePlayers(updatedPlayers);
+    if (currentLeague) {
+      const updatedLeague: League = {
+        ...currentLeague,
+        players: updatedPlayers,
+      };
+      setCurrentLeague(updatedLeague);
+      await syncLeagueToCloud(updatedLeague);
+    }
+
+    if (outcome.isJackpot) {
+      soundEffects.playCashoutSound();
+    } else {
+      soundEffects.playCoinSound();
+    }
+
+    setToastNotification({
+      title: outcome.isJackpot ? '🎰 JACKPOT RUOTA!' : '🎡 Ruota della Fortuna',
+      message: outcome.message,
+    });
+
+    return { success: true, outcome, isFree };
+  };
+
+  const claimAchievement = async (
+    achievementId: string
+  ): Promise<{ success: boolean; error?: string; coinsAwarded?: number }> => {
+    if (!associatedPlayer) {
+      return { success: false, error: 'Collega il tuo profilo per riscuotere i trofei!' };
+    }
+    const allStatuses = calculatePlayerAchievements(associatedPlayer, matches);
+    const achStatus = allStatuses.find((s) => s.achievement.id === achievementId);
+    if (!achStatus || achStatus.claimableTiers.length === 0) {
+      return { success: false, error: 'Nessun livello sbloccato da riscuotere per questo trofeo!' };
+    }
+
+    const reward = achStatus.totalClaimableCoins;
+    const newHighestTier = achStatus.highestReachedTier?.level || achStatus.claimedLevel;
+    const currentCoins = associatedPlayer.coins !== undefined ? associatedPlayer.coins : STARTING_COINS;
+    const claimedMap = { ...(associatedPlayer.claimedAchievements || {}) };
+    claimedMap[achievementId] = newHighestTier;
+
+    const updatedPlayers = players.map((p) => {
+      if (p.id === associatedPlayer.id) {
+        return {
+          ...p,
+          coins: currentCoins + reward,
+          claimedAchievements: claimedMap,
+        };
+      }
+      return p;
+    });
+
+    setPlayers(updatedPlayers);
+    await savePlayers(updatedPlayers);
+    if (currentLeague) {
+      const updatedLeague: League = {
+        ...currentLeague,
+        players: updatedPlayers,
+      };
+      setCurrentLeague(updatedLeague);
+      await syncLeagueToCloud(updatedLeague);
+    }
+
+    soundEffects.playCashoutSound();
+    setToastNotification({
+      title: `🏆 Trofeo Riscattato: ${achStatus.achievement.name}`,
+      message: `Hai riscattato il livello ${achStatus.highestReachedTier?.name} e ricevuto +${reward} LUL Coins!`,
+    });
+
+    return { success: true, coinsAwarded: reward };
+  };
+
+  const placeBounty = async (
+    targetPlayerId: string,
+    amount: number
+  ): Promise<{ success: boolean; error?: string }> => {
+    if (!associatedPlayer) {
+      return { success: false, error: 'Collega il tuo profilo per piazzare una taglia!' };
+    }
+    if (associatedPlayer.id === targetPlayerId) {
+      return { success: false, error: 'Non puoi mettere una taglia sulla tua stessa testa!' };
+    }
+    const currentCoins = associatedPlayer.coins !== undefined ? associatedPlayer.coins : STARTING_COINS;
+    if (amount <= 0 || amount > currentCoins) {
+      return { success: false, error: 'Saldo LUL Coins insufficiente per piazzare questa taglia!' };
+    }
+
+    const targetPlayer = players.find((p) => p.id === targetPlayerId);
+    if (!targetPlayer) {
+      return { success: false, error: 'Giocatore bersaglio non trovato!' };
+    }
+
+    const newBountyAmount = (targetPlayer.activeBounty?.amount || 0) + amount;
+    const newBounty: PlayerBounty = {
+      amount: newBountyAmount,
+      placedByPlayerId: associatedPlayer.id,
+      placedByPlayerName: associatedPlayer.name,
+      placedAt: Date.now(),
+    };
+
+    const updatedPlayers = players.map((p) => {
+      if (p.id === associatedPlayer.id) {
+        return {
+          ...p,
+          coins: currentCoins - amount,
+        };
+      }
+      if (p.id === targetPlayerId) {
+        return {
+          ...p,
+          activeBounty: newBounty,
+        };
+      }
+      return p;
+    });
+
+    setPlayers(updatedPlayers);
+    await savePlayers(updatedPlayers);
+    if (currentLeague) {
+      const updatedLeague: League = {
+        ...currentLeague,
+        players: updatedPlayers,
+      };
+      setCurrentLeague(updatedLeague);
+      await syncLeagueToCloud(updatedLeague);
+    }
+
+    soundEffects.playCoinSound();
+    setToastNotification({
+      title: '🎯 Taglia Piazzata!',
+      message: `Hai piazzato una taglia di ${amount} 🪙 sulla testa di ${targetPlayer.name}! Chiunque lo sconfigga incasserà la somma!`,
+    });
+
+    return { success: true };
+  };
+
   const purchaseShopItem = async (
     itemId: string
   ): Promise<{ success: boolean; error?: string; mysteryOutcome?: any }> => {
@@ -1191,7 +1472,11 @@ export const EloProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let newInventory = [...(associatedPlayer.inventory || [])];
     let newEquippedTitle = associatedPlayer.equippedTitle;
     let newEquippedBorder = associatedPlayer.equippedBorder;
+    let newEquippedSound = associatedPlayer.equippedSound;
     let newHasInsurance = associatedPlayer.hasBetInsurance;
+    let newActiveBetBooster = associatedPlayer.activeBetBooster;
+    let newActiveDeuceInsurance = associatedPlayer.activeDeuceInsurance;
+    let newTrophyShowcase = [...(associatedPlayer.trophyShowcase || [])];
     let newTags = [...(associatedPlayer.tags || [])];
 
     if (item.category === 'mystery') {
@@ -1200,8 +1485,32 @@ export const EloProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (mysteryOutcome.badge && !newTags.includes(mysteryOutcome.badge)) {
         newTags.push(mysteryOutcome.badge);
       }
-    } else if (item.category === 'perk' && item.id === 'perk_insurance') {
-      newHasInsurance = true;
+    } else if (item.category === 'trophy') {
+      if (!newTrophyShowcase.includes(item.id)) {
+        newTrophyShowcase.push(item.id);
+      }
+      if (!newInventory.includes(item.id)) {
+        newInventory.push(item.id);
+      }
+    } else if (item.category === 'sound') {
+      if (!newInventory.includes(item.id)) {
+        newInventory.push(item.id);
+      }
+      if (!newEquippedSound) {
+        newEquippedSound = item.soundPreviewId || item.id;
+      }
+    } else if (item.category === 'perk') {
+      if (item.id === 'perk_bet_booster') {
+        newActiveBetBooster = true;
+      } else if (item.id === 'perk_deuce_insurance') {
+        newActiveDeuceInsurance = true;
+      } else if (item.id === 'perk_insurance') {
+        newHasInsurance = true;
+      } else if (item.id === 'perk_custom_nickname') {
+        if (!newInventory.includes(item.id)) {
+          newInventory.push(item.id);
+        }
+      }
     } else {
       if (!newInventory.includes(item.id)) {
         newInventory.push(item.id);
@@ -1222,7 +1531,11 @@ export const EloProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           inventory: newInventory,
           equippedTitle: newEquippedTitle,
           equippedBorder: newEquippedBorder,
+          equippedSound: newEquippedSound,
           hasBetInsurance: newHasInsurance,
+          activeBetBooster: newActiveBetBooster,
+          activeDeuceInsurance: newActiveDeuceInsurance,
+          trophyShowcase: newTrophyShowcase,
           tags: newTags,
         };
       }
@@ -1250,7 +1563,7 @@ export const EloProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const equipPlayerItem = async (
-    itemType: 'title' | 'border',
+    itemType: 'title' | 'border' | 'sound',
     itemId: string | null
   ): Promise<{ success: boolean; error?: string }> => {
     if (!associatedPlayer) {
@@ -1265,10 +1578,15 @@ export const EloProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             ...p,
             equippedTitle: item ? item.name : undefined,
           };
-        } else {
+        } else if (itemType === 'border') {
           return {
             ...p,
             equippedBorder: itemId || undefined,
+          };
+        } else if (itemType === 'sound') {
+          return {
+            ...p,
+            equippedSound: itemId || undefined,
           };
         }
       }
@@ -1380,12 +1698,31 @@ export const EloProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const liveBets = currentLeague?.activeLiveMatch?.bets;
     const winnerSide: 1 | 2 = isP1Winner ? 1 : 2;
     const insurancesMap: Record<string, boolean> = {};
+    const boostersMap: Record<string, boolean> = {};
+    const deuceInsurancesMap: Record<string, boolean> = {};
     players.forEach((p) => {
-      if (p.hasBetInsurance) {
-        insurancesMap[p.id] = true;
-      }
+      if (p.hasBetInsurance) insurancesMap[p.id] = true;
+      if (p.activeBetBooster) boostersMap[p.id] = true;
+      if (p.activeDeuceInsurance) deuceInsurancesMap[p.id] = true;
     });
-    const betResolution = resolveMatchBets(liveBets, winnerSide, insurancesMap);
+    const betResolution = resolveMatchBets(
+      liveBets,
+      winnerSide,
+      score1,
+      score2,
+      options.stats,
+      insurancesMap,
+      boostersMap,
+      deuceInsurancesMap
+    );
+
+    // Gestione Taglia (Bounty) sulla testa dello sconfitto
+    let claimedBountyAmount = 0;
+    let bountyVictimName = '';
+    if (loser.activeBounty && loser.activeBounty.amount > 0) {
+      claimedBountyAmount = loser.activeBounty.amount;
+      bountyVictimName = loser.name;
+    }
 
     const newMatch: Match = {
       id: `match_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
@@ -1428,22 +1765,33 @@ export const EloProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       let wonBets = 0;
       let lostBets = 0;
       let netBetProfit = 0;
-      if (liveBets) {
-        Object.values(liveBets).forEach((b) => {
-          if (b.bettorId === p.id) {
-            if (b.betOnPlayer === winnerSide) {
-              wonBets += 1;
-              netBetProfit += Math.round(b.amount * b.odds) - b.amount;
-            } else {
-              lostBets += 1;
-              netBetProfit -= b.amount;
-            }
+      let placedBetInThisMatch = false;
+
+      Object.values(betResolution.updatedBets).forEach((b) => {
+        if (b.bettorId === p.id) {
+          placedBetInThisMatch = true;
+          if (b.status === 'won') {
+            wonBets += 1;
+            netBetProfit += (b.potentialPayout || Math.round(b.amount * b.odds)) - b.amount;
+          } else {
+            lostBets += 1;
+            const refund = b.potentialPayout || 0;
+            netBetProfit -= (b.amount - refund);
           }
-        });
-      }
+        }
+      });
+
+      // Reset consumabili scommessa se il giocatore ha puntato in questa partita
+      const resetBetInsurance = placedBetInThisMatch ? false : p.hasBetInsurance;
+      const resetBetBooster = placedBetInThisMatch ? false : p.activeBetBooster;
+      const resetDeuceInsurance = placedBetInThisMatch ? false : p.activeDeuceInsurance;
 
       if (p.id === winner.id) {
         playerCoins += MATCH_WIN_COINS;
+        if (claimedBountyAmount > 0) {
+          playerCoins += claimedBountyAmount;
+        }
+
         const newElo = eloCalc.winnerEloAfter;
         const newStreak = p.currentStreak > 0 ? p.currentStreak + 1 : 1;
         const addedRace = isP1Winner ? raceDeltas.p1RacePoints : raceDeltas.p2RacePoints;
@@ -1467,6 +1815,9 @@ export const EloProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           betsWon: (p.betsWon || 0) + wonBets,
           betsLost: (p.betsLost || 0) + lostBets,
           coinsWonOnBets: (p.coinsWonOnBets || 0) + netBetProfit,
+          hasBetInsurance: resetBetInsurance,
+          activeBetBooster: resetBetBooster,
+          activeDeuceInsurance: resetDeuceInsurance,
         };
 
         if (threshold) {
@@ -1494,6 +1845,10 @@ export const EloProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           betsWon: (p.betsWon || 0) + wonBets,
           betsLost: (p.betsLost || 0) + lostBets,
           coinsWonOnBets: (p.coinsWonOnBets || 0) + netBetProfit,
+          activeBounty: undefined, // Taglia riscossa dal vincitore
+          hasBetInsurance: resetBetInsurance,
+          activeBetBooster: resetBetBooster,
+          activeDeuceInsurance: resetDeuceInsurance,
         };
       }
 
@@ -1505,6 +1860,9 @@ export const EloProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           betsWon: (p.betsWon || 0) + wonBets,
           betsLost: (p.betsLost || 0) + lostBets,
           coinsWonOnBets: (p.coinsWonOnBets || 0) + netBetProfit,
+          hasBetInsurance: resetBetInsurance,
+          activeBetBooster: resetBetBooster,
+          activeDeuceInsurance: resetDeuceInsurance,
         };
       }
 
@@ -1534,6 +1892,17 @@ export const EloProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
       setCurrentLeague(updatedLeague);
       await syncLeagueToCloud(updatedLeague);
+    }
+
+    // Suona l'inno di vittoria equipaggiato dal vincitore!
+    soundEffects.playAnthem(winner.equippedSound);
+
+    // Notifica speciale per taglia riscossa
+    if (claimedBountyAmount > 0) {
+      setToastNotification({
+        title: '🎯 TAGLIA INCASSATA!',
+        message: `${winner.name} ha incassato la taglia di ${claimedBountyAmount} 🪙 sulla testa di ${bountyVictimName}!`,
+      });
     }
 
     // Trigger celebrazioni se vittoria epica o soglia superata
@@ -1897,7 +2266,11 @@ export const EloProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // LUL Coins & Riunione Bet
         placeLiveBet,
         claimBailout,
+        claimDailyReward,
+        spinWheel,
         resetAllCoins,
+        claimAchievement,
+        placeBounty,
 
         // Bazar Shop
         purchaseShopItem,

@@ -10,12 +10,15 @@ import {
     getWinRate,
 } from '../elo';
 import {
+    calculateAllLiveMarkets,
     calculateLiveDynamicOdds,
     calculatePreMatchOdds,
     handleBilateralBetRule,
     resolveMatchBets,
+    validateBetPlacement,
 } from '../betting';
-import { openMysteryBox, SHOP_ITEMS } from '../shop';
+import { openMysteryBox, SHOP_ITEMS, spinLuckyWheel, WHEEL_SECTORS } from '../shop';
+import { calculatePlayerAchievements, ACHIEVEMENTS } from '../achievements';
 import { sanitizePlayerUpdates } from '../security';
 import { calculateSpecialTrophies, getPlayerTrophies } from '../trophies';
 import { LiveBet, Match, Player } from '../types';
@@ -304,7 +307,131 @@ function runTests() {
   console.assert(smashKing17?.statValue.includes('4.0/m'), `Test 17b Fallito: attesa media 4.0/m, ottenuto ${smashKing17?.statValue}`);
   console.log('✓ Test 17 Superato: Trofei speciali assegnati per media su partite live, escluse partite non-live e soglia minima rispettata');
 
-  console.log('\nTUTTI I 17 TEST AVANZATI SUPERATI CON SUCCESSO! 🎉');
+  // Test 18: Regola Ferrea Anti-Match-Fixing (Giocatore in campo punta solo su se stesso per vincere)
+  // P1 tenta di puntare sull'avversario P2: BLOCCATO
+  const betOnOpponent = validateBetPlacement('p1', 'p1', 'p2', 'match_winner', 2);
+  console.assert(betOnOpponent.valid === false, 'Test 18a Fallito: puntata su avversario deve essere bloccata');
+  console.assert(betOnOpponent.error?.includes('Anti-Biscotto'), 'Test 18b Fallito: messaggio anti-biscotto atteso');
+
+  // P1 tenta di puntare su mercati secondari (Over/Under punti): BLOCCATO
+  const betOnSideMarket = validateBetPlacement('p1', 'p1', 'p2', 'total_points');
+  console.assert(betOnSideMarket.valid === false, 'Test 18c Fallito: giocatore in campo non può puntare su mercati secondari');
+
+  // P1 punta su se stesso (vincitore P1): PERMESSO
+  const betOnSelf = validateBetPlacement('p1', 'p1', 'p2', 'match_winner', 1);
+  console.assert(betOnSelf.valid === true, 'Test 18d Fallito: giocatore deve poter puntare su se stesso');
+
+  // Spettatore neutrale p3 punta su qualsiasi mercato: PERMESSO
+  const betSpectator = validateBetPlacement('p3', 'p1', 'p2', 'total_smashes');
+  console.assert(betSpectator.valid === true, 'Test 18e Fallito: spettatore neutrale può puntare su mercati secondari');
+  console.log('✓ Test 18 Superato: Regola ferrea anti-match-fixing verificata con successo');
+
+  // Test 19: Calcolo Quote Live Multi-Mercato & Risoluzione Scommesse
+  const allMarkets = calculateAllLiveMarkets(
+    'Alice',
+    'Bob',
+    1250,
+    1200,
+    8,
+    7,
+    11,
+    {
+      player1Smashes: 2,
+      player2Smashes: 1,
+      player1Edges: 1,
+      player2Edges: 0,
+      player1Nets: 1,
+      player2Nets: 0,
+      targetPoints: 11,
+    }
+  );
+  console.assert(allMarkets.length === 5, `Test 19a Fallito: attesi 5 mercati live, trovati ${allMarkets.length}`);
+  const smashMkt = allMarkets.find((m) => m.type === 'total_smashes');
+  console.assert(smashMkt?.targetLine === 2.5, 'Test 19b Fallito: linea smash attesa 2.5');
+
+  // Risoluzione scommessa multi-mercato
+  const multiBets: Record<string, LiveBet> = {
+    bet_points: {
+      id: 'bet_points',
+      type: 'live_dynamic',
+      marketType: 'total_points',
+      selection: 'over',
+      selectionLabel: 'Over 18.5',
+      targetLine: 18.5,
+      bettorId: 'spectator_1',
+      bettorName: 'Spec 1',
+      bettorAvatar: '👀',
+      amount: 40,
+      odds: 2.0,
+      scoreAtBet: '8 - 7',
+      potentialPayout: 80,
+      status: 'pending',
+      timestamp: Date.now(),
+    },
+    bet_smash: {
+      id: 'bet_smash',
+      type: 'live_dynamic',
+      marketType: 'total_smashes',
+      selection: 'under',
+      selectionLabel: 'Under 2.5',
+      targetLine: 2.5,
+      bettorId: 'spectator_2',
+      bettorName: 'Spec 2',
+      bettorAvatar: '🦁',
+      amount: 50,
+      odds: 1.8,
+      scoreAtBet: '8 - 7',
+      potentialPayout: 90,
+      status: 'pending',
+      timestamp: Date.now(),
+    },
+  };
+
+  // Match si conclude 11-9 (totale punti 20 > 18.5 -> Over vince)
+  // Smash totali: 3 (> 2.5 -> Under perde)
+  const resMulti = resolveMatchBets(
+    multiBets,
+    1,
+    11,
+    9,
+    { player1Smashes: 2, player2Smashes: 1, targetPoints: 11 },
+    undefined,
+    { spectator_1: true } // Booster attivo su spectator_1! Raddoppia profitto netto: (80-40)*2 + 40 = 120
+  );
+  console.assert(resMulti.updatedBets['bet_points'].status === 'won', 'Test 19c Fallito: bet_points deve essere vinta');
+  console.assert(resMulti.payouts['spectator_1'] === 120, `Test 19d Fallito: payout con booster atteso 120, ricevuto ${resMulti.payouts['spectator_1']}`);
+  console.assert(resMulti.updatedBets['bet_smash'].status === 'lost', 'Test 19e Fallito: bet_smash under deve essere persa');
+  console.log('✓ Test 19 Superato: Mercati multipli live e risoluzione con booster funzionanti');
+
+  // Test 20: 6-Tier Achievements Retroattivi (Legno..Gear 5) & Calcolo Premi
+  const playerAchTest = {
+    id: 'p_ach',
+    name: 'Smasher',
+    coins: 500,
+    claimedAchievements: {},
+  } as unknown as Player;
+
+  const matchesForAch: Match[] = [
+    { id: 'm1', player1Id: 'p_ach', player2Id: 'p2', stats: { player1Smashes: 25 } } as unknown as Match,
+  ];
+
+  const achStatuses = calculatePlayerAchievements(playerAchTest, matchesForAch);
+  const smashAch = achStatuses.find((s) => s.achievement.id === 'smash_king');
+  console.assert(smashAch !== undefined, 'Test 20a Fallito: achievement smash_king non trovato');
+  console.assert(smashAch?.currentValue === 25, `Test 20b Fallito: attesi 25 smash, trovati ${smashAch?.currentValue}`);
+  // 25 smash ha superato Legno (5) e Bronzo (20). Livello più alto: 2 (Bronzo).
+  console.assert(smashAch?.highestReachedTier?.level === 2, `Test 20c Fallito: atteso livello 2, trovato ${smashAch?.highestReachedTier?.level}`);
+  // Premi da riscuotere: 15 (Legno) + 30 (Bronzo) = 45 monete
+  console.assert(smashAch?.totalClaimableCoins === 45, `Test 20d Fallito: attese 45 monete da riscuotere, trovate ${smashAch?.totalClaimableCoins}`);
+  console.log('✓ Test 20 Superato: 6-Tier achievements retroattivi e calcolo monete claimable corretto');
+
+  // Test 21: Ruota della Fortuna (Lucky Wheel)
+  const wheelSpin = spinLuckyWheel();
+  console.assert(wheelSpin.sector.index >= 0 && wheelSpin.sector.index < WHEEL_SECTORS.length, 'Test 21a Fallito: indice settore ruota non valido');
+  console.assert(wheelSpin.sector.label.length > 0, 'Test 21b Fallito: label outcome vuota');
+  console.log(`✓ Test 21 Superato: Ruota della fortuna gira con successo -> estrazione "${wheelSpin.sector.label}"`);
+
+  console.log('\nTUTTI I 21 TEST AVANZATI SUPERATI CON SUCCESSO! 🎉');
 }
 
 runTests();

@@ -153,40 +153,40 @@ export const MatchCard: React.FC<MatchCardProps> = ({
 
       {/* Statistiche Live Match se registrate */}
       {match.stats && (
-        (match.stats.player1Edges > 0 ||
-          match.stats.player2Edges > 0 ||
-          match.stats.player1Nets > 0 ||
-          match.stats.player2Nets > 0 ||
-          match.stats.player1Smashes > 0 ||
-          match.stats.player2Smashes > 0 ||
-          match.stats.player1ServeErrors > 0 ||
-          match.stats.player2ServeErrors > 0) && (
+        ((match.stats.player1Edges || 0) > 0 ||
+          (match.stats.player2Edges || 0) > 0 ||
+          (match.stats.player1Nets || 0) > 0 ||
+          (match.stats.player2Nets || 0) > 0 ||
+          (match.stats.player1Smashes || 0) > 0 ||
+          (match.stats.player2Smashes || 0) > 0 ||
+          (match.stats.player1ServeErrors || 0) > 0 ||
+          (match.stats.player2ServeErrors || 0) > 0) && (
           <View style={styles.statsSummaryRow}>
-            {(match.stats.player1Edges > 0 || match.stats.player2Edges > 0) && (
+            {((match.stats.player1Edges || 0) > 0 || (match.stats.player2Edges || 0) > 0) && (
               <View style={styles.statsPill}>
                 <Text style={styles.statsPillText}>
-                  🎲 Spigoli: {match.stats.player1Edges}-{match.stats.player2Edges}
+                  🎲 Spigoli: {match.stats.player1Edges || 0}-{match.stats.player2Edges || 0}
                 </Text>
               </View>
             )}
-            {(match.stats.player1Nets > 0 || match.stats.player2Nets > 0) && (
+            {((match.stats.player1Nets || 0) > 0 || (match.stats.player2Nets || 0) > 0) && (
               <View style={styles.statsPill}>
                 <Text style={styles.statsPillText}>
-                  🕸️ Net: {match.stats.player1Nets}-{match.stats.player2Nets}
+                  🕸️ Net: {match.stats.player1Nets || 0}-{match.stats.player2Nets || 0}
                 </Text>
               </View>
             )}
-            {(match.stats.player1Smashes > 0 || match.stats.player2Smashes > 0) && (
+            {((match.stats.player1Smashes || 0) > 0 || (match.stats.player2Smashes || 0) > 0) && (
               <View style={styles.statsPillSmash}>
                 <Text style={styles.statsPillTextSmash}>
-                  💥 Smash: {match.stats.player1Smashes}-{match.stats.player2Smashes}
+                  💥 Smash: {match.stats.player1Smashes || 0}-{match.stats.player2Smashes || 0}
                 </Text>
               </View>
             )}
-            {(match.stats.player1ServeErrors > 0 || match.stats.player2ServeErrors > 0) && (
+            {((match.stats.player1ServeErrors || 0) > 0 || (match.stats.player2ServeErrors || 0) > 0) && (
               <View style={styles.statsPillFault}>
                 <Text style={styles.statsPillTextFault}>
-                  ❌ Falli: {match.stats.player1ServeErrors}-{match.stats.player2ServeErrors}
+                  ❌ Falli: {match.stats.player1ServeErrors || 0}-{match.stats.player2ServeErrors || 0}
                 </Text>
               </View>
             )}

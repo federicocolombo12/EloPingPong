@@ -1,3 +1,10 @@
+export interface PlayerBounty {
+  amount: number;
+  placedByPlayerId: string;
+  placedByPlayerName: string;
+  placedAt: number;
+}
+
 export interface Player {
   id: string;
   name: string;
@@ -27,31 +34,63 @@ export interface Player {
   equippedTitle?: string; // Titolo onorario equipaggiato (es. "🎯 Il Cecchino")
   equippedBorder?: string; // ID cornice neon/aura equipaggiata (es. "border_gold")
   hasBetInsurance?: boolean; // Se ha un token assicurazione attivo per la prossima scommessa
+  equippedSound?: string; // ID dell'inno sonoro di vittoria equipaggiato (es. "sound_ff7_fanfare")
+  trophyShowcase?: string[]; // ID dei trofei/cimeli d'élite posseduti nella bacheca
+  activeBounty?: PlayerBounty; // Taglia attiva sulla testa del giocatore
+  activeBetBooster?: boolean; // Booster Quota 2x attivo per la prossima scommessa vincente
+  activeDeuceInsurance?: boolean; // Assicurazione Vantaggi: rimborso 100% se il favorito perde ai vantaggi
+  lastDailyRewardAt?: number; // Timestamp dell'ultimo bonus giornaliero (+50 coins) riscattato
+  lastDailySpinAt?: number; // Timestamp dell'ultimo giro gratuito alla ruota della fortuna
+  claimedAchievements?: Record<string, number>; // achievementId -> max tier level claimed (1..6)
 }
+
+export type ShopItemCategory =
+  | 'title'
+  | 'border'
+  | 'sound'
+  | 'trophy'
+  | 'perk'
+  | 'mystery'
+  | 'custom_tag';
 
 export interface ShopItem {
   id: string;
   name: string;
   description: string;
   price: number;
-  category: 'title' | 'border' | 'perk' | 'mystery';
+  category: ShopItemCategory;
   icon: string;
   previewColor?: string;
+  soundPreviewId?: string;
+  trophyBadge?: string;
 }
+
+export type BetMarketType =
+  | 'match_winner'
+  | 'total_points'
+  | 'total_smashes'
+  | 'luck_points'
+  | 'deuce_happens';
 
 export interface LiveBet {
   id: string;
   type: 'pre_match' | 'live_dynamic';
+  marketType?: BetMarketType; // default 'match_winner'
+  marketLabel?: string; // Es. "Vincitore Match", "Punti Totali", "Botto di Smash", "Fattore Culo"
   bettorId: string;
   bettorName: string;
   bettorAvatar: string;
-  betOnPlayer: 1 | 2;
+  betOnPlayer?: 1 | 2; // Per scommesse vincitore match
+  selection?: string; // '1' | '2' | 'over' | 'under' | 'yes' | 'no'
+  selectionLabel?: string; // Es. "Fede", "Over 18.5", "Almeno 2 Smash", "Sì ai Vantaggi"
+  targetLine?: number; // Es. 18.5, 2.5, 1.5
   amount: number;
   odds: number;
-  scoreAtBet: string; // e.g. "Pre-match" o "10 - 18"
+  scoreAtBet: string; // e.g. "Pre-match" o "10 - 8"
   potentialPayout: number;
   status: 'pending' | 'won' | 'lost';
   timestamp: number;
+  usedBooster?: boolean; // Se ha raddoppiato la vincita netta con il Booster 2x
 }
 
 export interface MatchComment {
@@ -66,14 +105,14 @@ export interface MatchComment {
 }
 
 export interface MatchLiveStats {
-  player1Edges: number; // Spigoli P1
-  player2Edges: number; // Spigoli P2
-  player1Nets: number; // Retine P1
-  player2Nets: number; // Retine P2
-  player1Smashes: number; // Schiacciate vincenti P1
-  player2Smashes: number; // Schiacciate vincenti P2
-  player1ServeErrors: number; // Errori in battuta P1
-  player2ServeErrors: number; // Errori in battuta P2
+  player1Edges?: number; // Spigoli P1
+  player2Edges?: number; // Spigoli P2
+  player1Nets?: number; // Retine P1
+  player2Nets?: number; // Retine P2
+  player1Smashes?: number; // Schiacciate vincenti P1
+  player2Smashes?: number; // Schiacciate vincenti P2
+  player1ServeErrors?: number; // Errori in battuta P1
+  player2ServeErrors?: number; // Errori in battuta P2
   player1Aces?: number; // Ace vincenti P1
   player2Aces?: number; // Ace vincenti P2
   player1Defenses?: number; // Punti strappati in difesa P1
