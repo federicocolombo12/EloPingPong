@@ -26,7 +26,7 @@
     "web": "expo start --web",
     "check": "tsc --noEmit",
     "test": "tsc src/core/elo.ts src/core/constants.ts src/core/trophies.ts src/core/security.ts src/core/betting.ts src/core/shop.ts src/core/achievements.ts src/core/__tests__/elo.test.ts --outDir ./dist_test --module commonjs --target es2022 --skipLibCheck --ignoreConfig && node ./dist_test/__tests__/elo.test.js && rm -rf ./dist_test",
-    "deploy": "EXPO_NO_TELEMETRY=1 expo export -p web && vercel deploy ./dist --prod --yes && vercel alias set dist-lyart-theta-16.vercel.app elopingpong-arena.vercel.app"
+    "deploy": "EXPO_NO_TELEMETRY=1 npx expo export -p web && npx vercel deploy ./dist --prod --yes && npx vercel alias set dist-lyart-theta-16.vercel.app elopingpong-arena.vercel.app"
   },
   "private": true
 }

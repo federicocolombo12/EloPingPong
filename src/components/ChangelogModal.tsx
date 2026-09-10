@@ -24,10 +24,53 @@ interface ChangelogRelease {
 
 export const RELEASES: ChangelogRelease[] = [
   {
+    version: 'v3.0.0',
+    codename: 'Bazar d\'Élite, 6-Tier Achievements & Multi-Market Live Bet',
+    date: 'Settembre 2026',
+    isCurrent: true,
+    features: [
+      {
+        icon: '🛍️',
+        title: 'Bazar Rinnovato & Trofei d\'Élite',
+        desc: 'Interfaccia compatta a 6 schede orizzontali senza scroll. Trofei prestigiosi (Anello del Campione, Racchetta di Diamante, G.O.A.T., Monumento), aure neon (RGB e Oro Puro) e inni di vittoria sonori.',
+      },
+      {
+        icon: '🎮',
+        title: 'FFVII Fanfare & Inni di Vittoria',
+        desc: 'Inno trionfale procedurale con il leggendario jingle di vittoria di Final Fantasy VII (FFVII) riprodotto ad ogni tuo trionfo, con pulsante di anteprima audio nello shop!',
+      },
+      {
+        icon: '🎡',
+        title: 'Ruota della Fortuna & Sussidio 24h',
+        desc: '1 spin gratis ogni 24h alla Ruota della Fortuna (successivi a 50 🪙) con ricchi premi, Booster 2x e Jackpot da 500 🪙. Sussidio giornaliero di 50 monete ogni giorno.',
+      },
+      {
+        icon: '🎲',
+        title: 'Scommesse Live Multi-Mercato & Anti-Biscotto',
+        desc: 'Quote live dinamiche su 5 mercati: Vincitore, Under/Over punti, Botto di Smash, Fattore Culo (spigoli/retine) e Vantaggi ai Titoli di Coda. Regola ferrea anti-match-fixing: chi gioca in campo può puntare solo sulla propria vittoria!',
+      },
+      {
+        icon: '🌟',
+        title: '8 Obiettivi a 6 Livelli (Fino a Gear 5)',
+        desc: 'Achievement retroattivi calcolati sullo storico per smash, ace, difese, freddezza, strisce, vittorie, scommesse e patrimonio. 6 tier: Legno, Bronzo, Argento, Oro, Diamante e Gear 5 con monete riscattabili!',
+      },
+      {
+        icon: '🎯',
+        title: 'Poster WANTED & Piazza Taglia',
+        desc: 'Nuova sezione taglie nella Scheda Agente: piazza una taglia in LUL Coins sulla testa dei rivali; chiunque li batterà in un match live incasserà subito il bottino!',
+      },
+      {
+        icon: '🛡️',
+        title: 'Meritocrazia Trofei & Tag',
+        desc: 'Eliminata l\'auto-assegnazione arbitraria: si possono equipaggiare solo trofei e titoli conquistati con merito o acquistati nel Bazar.',
+      },
+    ],
+  },
+  {
     version: 'v2.9.0',
     codename: 'Bazar, Stats Unificate & Live Redesign',
     date: 'Settembre 2026',
-    isCurrent: true,
+    isCurrent: false,
     features: [
       {
         icon: '🛍️',
