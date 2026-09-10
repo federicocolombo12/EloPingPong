@@ -167,6 +167,13 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
         luckPoints = edges + nets;
       }
 
+      const avgLuck = liveMatches > 0 ? luckPoints / liveMatches : 0;
+      const avgStyle = liveMatches > 0 ? stylePoints / liveMatches : 0;
+      const avgSmash = liveMatches > 0 ? smashes / liveMatches : 0;
+      const avgAce = liveMatches > 0 ? aces / liveMatches : 0;
+      const avgDefense = liveMatches > 0 ? defenses / liveMatches : 0;
+      const avgFaults = liveMatches > 0 ? serveErrors / liveMatches : 0;
+
       return {
         player: p,
         edges,
@@ -178,6 +185,12 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
         defenses,
         serveErrors,
         liveMatches,
+        avgLuck,
+        avgStyle,
+        avgSmash,
+        avgAce,
+        avgDefense,
+        avgFaults,
       };
     });
   }, [players, matches]);
@@ -185,27 +198,45 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
   const totalLiveMatches = useMemo(() => matches.filter((m) => !!m.stats).length, [matches]);
 
   const luckyRanking = useMemo(
-    () => [...liveStatsByPlayer].sort((a, b) => b.luckPoints - a.luckPoints),
+    () =>
+      [...liveStatsByPlayer]
+        .filter((a) => a.liveMatches > 0)
+        .sort((a, b) => b.avgLuck - a.avgLuck || b.luckPoints - a.luckPoints),
     [liveStatsByPlayer]
   );
   const defenseRanking = useMemo(
-    () => [...liveStatsByPlayer].sort((a, b) => b.defenses - a.defenses),
+    () =>
+      [...liveStatsByPlayer]
+        .filter((a) => a.liveMatches > 0)
+        .sort((a, b) => b.avgDefense - a.avgDefense || b.defenses - a.defenses),
     [liveStatsByPlayer]
   );
   const aceRanking = useMemo(
-    () => [...liveStatsByPlayer].sort((a, b) => b.aces - a.aces),
+    () =>
+      [...liveStatsByPlayer]
+        .filter((a) => a.liveMatches > 0)
+        .sort((a, b) => b.avgAce - a.avgAce || b.aces - a.aces),
     [liveStatsByPlayer]
   );
   const styleRanking = useMemo(
-    () => [...liveStatsByPlayer].sort((a, b) => b.stylePoints - a.stylePoints),
+    () =>
+      [...liveStatsByPlayer]
+        .filter((a) => a.liveMatches > 0)
+        .sort((a, b) => b.avgStyle - a.avgStyle || b.stylePoints - a.stylePoints),
     [liveStatsByPlayer]
   );
   const smashRanking = useMemo(
-    () => [...liveStatsByPlayer].sort((a, b) => b.smashes - a.smashes),
+    () =>
+      [...liveStatsByPlayer]
+        .filter((a) => a.liveMatches > 0)
+        .sort((a, b) => b.avgSmash - a.avgSmash || b.smashes - a.smashes),
     [liveStatsByPlayer]
   );
   const mostFaultsRanking = useMemo(
-    () => [...liveStatsByPlayer].sort((a, b) => b.serveErrors - a.serveErrors),
+    () =>
+      [...liveStatsByPlayer]
+        .filter((a) => a.liveMatches > 0)
+        .sort((a, b) => b.avgFaults - a.avgFaults || b.serveErrors - a.serveErrors),
     [liveStatsByPlayer]
   );
 
@@ -612,7 +643,10 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
 
                   {/* Classifica Dettagliata Fortuna (Spigoli + Net) */}
                   <View style={styles.tableCard}>
-                    <Text style={styles.tableTitle}>🍀 Classifica "Punti Fortuna" (Net + Spigoli)</Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <Text style={styles.tableTitle}>🍀 Classifica "Punti Fortuna" (Net + Spigoli)</Text>
+                      <Text style={{ fontSize: 10, color: '#94A3B8', fontWeight: '700' }}>Media per match live</Text>
+                    </View>
                     {luckyRanking.map((item, index) => (
                       <View key={item.player.id} style={styles.tableRow}>
                         <Text style={styles.rankNum}>
@@ -624,11 +658,16 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
                         </Text>
                         <View style={styles.tableStatsBreakdown}>
                           <Text style={styles.tableStatSub}>
-                            🎲 {item.edges} • 🕸️ {item.nets}
+                            🎲 {item.edges} • 🕸️ {item.nets} ({item.liveMatches} live)
                           </Text>
                         </View>
                         <View style={styles.tableScoreBadge}>
-                          <Text style={styles.tableScoreText}>{item.luckPoints} pt</Text>
+                          <Text style={styles.tableScoreText}>
+                            {item.liveMatches > 0 ? `${item.avgLuck.toFixed(1)}/m` : '0/m'}
+                          </Text>
+                          <Text style={{ fontSize: 9, color: '#94A3B8', textAlign: 'center' }}>
+                            ({item.luckPoints} tot)
+                          </Text>
                         </View>
                       </View>
                     ))}
@@ -647,7 +686,9 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
                           <Text style={styles.miniName} numberOfLines={1}>
                             {item.player.name}
                           </Text>
-                          <Text style={styles.miniValueDefense}>{item.defenses} 🛡️</Text>
+                          <Text style={styles.miniValueDefense}>
+                            {item.liveMatches > 0 ? `${item.avgDefense.toFixed(1)}/m (${item.defenses})` : '0 🛡️'}
+                          </Text>
                         </View>
                       ))}
                     </View>
@@ -663,7 +704,9 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
                           <Text style={styles.miniName} numberOfLines={1}>
                             {item.player.name}
                           </Text>
-                          <Text style={styles.miniValueAce}>{item.aces} ⚡</Text>
+                          <Text style={styles.miniValueAce}>
+                            {item.liveMatches > 0 ? `${item.avgAce.toFixed(1)}/m (${item.aces})` : '0 ⚡'}
+                          </Text>
                         </View>
                       ))}
                     </View>
@@ -681,7 +724,9 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
                           <Text style={styles.miniName} numberOfLines={1}>
                             {item.player.name}
                           </Text>
-                          <Text style={styles.miniValueStyle}>{item.stylePoints} ✨</Text>
+                          <Text style={styles.miniValueStyle}>
+                            {item.liveMatches > 0 ? `${item.avgStyle.toFixed(1)}/m (${item.stylePoints})` : '0 ✨'}
+                          </Text>
                         </View>
                       ))}
                     </View>
@@ -697,7 +742,9 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
                           <Text style={styles.miniName} numberOfLines={1}>
                             {item.player.name}
                           </Text>
-                          <Text style={styles.miniValue}>{item.smashes} 💥</Text>
+                          <Text style={styles.miniValue}>
+                            {item.liveMatches > 0 ? `${item.avgSmash.toFixed(1)}/m (${item.smashes})` : '0 💥'}
+                          </Text>
                         </View>
                       ))}
                     </View>
@@ -714,7 +761,9 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
                           <Text style={styles.miniName} numberOfLines={1}>
                             {item.player.name}
                           </Text>
-                          <Text style={styles.miniValueFault}>{item.serveErrors} ❌</Text>
+                          <Text style={styles.miniValueFault}>
+                            {item.liveMatches > 0 ? `${item.avgFaults.toFixed(1)}/m (${item.serveErrors})` : '0 ❌'}
+                          </Text>
                         </View>
                       ))}
                     </View>

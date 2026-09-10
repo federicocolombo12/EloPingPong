@@ -201,6 +201,34 @@ export const MatchCard: React.FC<MatchCardProps> = ({
         </View>
       ) : null}
 
+      {/* SCOMMESSE PIAZZATE SUL MATCH */}
+      {match.bets && Object.keys(match.bets).length > 0 && (
+        <View style={styles.betsContainer}>
+          <Text style={styles.betsTitle}>🎲 Riunione Bet:</Text>
+          <View style={styles.betsGrid}>
+            {Object.values(match.bets).map((bet) => {
+              const targetName = bet.betOnPlayer === 1 ? p1?.name : p2?.name;
+              const isWon = bet.status === 'won';
+              return (
+                <View
+                  key={bet.id}
+                  style={[
+                    styles.betItem,
+                    isWon ? styles.betItemWon : styles.betItemLost,
+                  ]}
+                >
+                  <Text style={styles.betItemText}>
+                    {bet.bettorAvatar} {bet.bettorName}:{' '}
+                    <Text style={{ fontWeight: '800' }}>{bet.amount}🪙</Text> su {targetName} ({bet.odds.toFixed(2)}x){' '}
+                    ➔ {isWon ? <Text style={styles.betItemWonText}>+{bet.potentialPayout}🪙 🎉</Text> : <Text style={styles.betItemLostText}>Persa 💀</Text>}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      )}
+
       {/* BARRA INTERATTIVA: REAZIONI & COMMENTI (Stile Reddit) */}
       <View style={styles.socialBar}>
         {/* Reazioni attive */}
@@ -521,5 +549,48 @@ const styles = StyleSheet.create({
     color: '#F87171',
     fontSize: 11,
     fontWeight: '700',
+  },
+  betsContainer: {
+    marginTop: 8,
+    padding: 8,
+    backgroundColor: 'rgba(250, 204, 21, 0.05)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(250, 204, 21, 0.2)',
+  },
+  betsTitle: {
+    color: '#FACC15',
+    fontSize: 11,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  betsGrid: {
+    gap: 4,
+  },
+  betItem: {
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  betItemWon: {
+    backgroundColor: 'rgba(52, 211, 153, 0.1)',
+    borderColor: 'rgba(52, 211, 153, 0.3)',
+  },
+  betItemLost: {
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    borderColor: 'rgba(239, 68, 68, 0.2)',
+  },
+  betItemText: {
+    color: Colors.textSecondary,
+    fontSize: 10,
+  },
+  betItemWonText: {
+    color: '#34D399',
+    fontWeight: '800',
+  },
+  betItemLostText: {
+    color: '#EF4444',
+    fontWeight: '800',
   },
 });

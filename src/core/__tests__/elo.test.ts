@@ -279,7 +279,32 @@ function runTests() {
   console.assert(mysteryOutcome.coins >= 25 && mysteryOutcome.coins <= 250, 'Test 16b Fallito: monete mystery box fuori range');
   console.log('✓ Test 16 Superato: Catalogo Bazar completo e logica Pacco Sorpresa funzionante');
 
-  console.log('\nTUTTI I 16 TEST AVANZATI SUPERATI CON SUCCESSO! 🎉');
+  // Test 17: Trofei Speciali calcolati su media per partita live ed esclusione partite non-live
+  const playerA = { id: 'pA', name: 'Player A', avatar: '🦁', elo: 1200, wins: 2, losses: 0, currentStreak: 2 } as unknown as Player;
+  const playerB = { id: 'pB', name: 'Player B', avatar: '🐯', elo: 1200, wins: 7, losses: 0, currentStreak: 7 } as unknown as Player;
+  const playerC = { id: 'pC', name: 'Player C', avatar: '🐼', elo: 1200, wins: 10, losses: 0, currentStreak: 10 } as unknown as Player;
+  const playerD = { id: 'pD', name: 'Player D', avatar: '🦊', elo: 1200, wins: 1, losses: 0, currentStreak: 1 } as unknown as Player;
+
+  const test17Matches: Match[] = [
+    // 2 Live matches per Player A (totale 8 smash -> media 4.0/m)
+    { id: 'm1', player1Id: 'pA', player2Id: 'pB', score1: 11, score2: 8, winnerId: 'pA', loserId: 'pB', timestamp: now, stats: { player1Smashes: 5, player2Smashes: 2 } } as unknown as Match,
+    { id: 'm2', player1Id: 'pA', player2Id: 'pB', score1: 11, score2: 9, winnerId: 'pA', loserId: 'pB', timestamp: now, stats: { player1Smashes: 3, player2Smashes: 2 } } as unknown as Match,
+    // 5 Partite non-live per Player B (senza stats: non devono contare nel conteggio live e non devono penalizzare)
+    { id: 'm3', player1Id: 'pB', player2Id: 'pC', score1: 11, score2: 7, winnerId: 'pB', loserId: 'pC', timestamp: now } as unknown as Match,
+    { id: 'm4', player1Id: 'pB', player2Id: 'pC', score1: 11, score2: 5, winnerId: 'pB', loserId: 'pC', timestamp: now } as unknown as Match,
+    { id: 'm5', player1Id: 'pB', player2Id: 'pC', score1: 11, score2: 4, winnerId: 'pB', loserId: 'pC', timestamp: now } as unknown as Match,
+    // Player D: 1 sola partita live con 6 smash (media 6.0/m, ma esclusa perché sotto la soglia minima di 2 live)
+    { id: 'm6', player1Id: 'pD', player2Id: 'pC', score1: 11, score2: 2, winnerId: 'pD', loserId: 'pC', timestamp: now, stats: { player1Smashes: 6, player2Smashes: 0 } } as unknown as Match,
+  ];
+
+  const trophies17 = calculateSpecialTrophies([playerA, playerB, playerC, playerD], test17Matches);
+  const smashKing17 = trophies17.find((t) => t.id === 'smash_king');
+
+  console.assert(smashKing17?.winnerPlayerId === 'pA', `Test 17a Fallito: Re dello Smash atteso Player A, ottenuto ${smashKing17?.winnerPlayerName}`);
+  console.assert(smashKing17?.statValue.includes('4.0/m'), `Test 17b Fallito: attesa media 4.0/m, ottenuto ${smashKing17?.statValue}`);
+  console.log('✓ Test 17 Superato: Trofei speciali assegnati per media su partite live, escluse partite non-live e soglia minima rispettata');
+
+  console.log('\nTUTTI I 17 TEST AVANZATI SUPERATI CON SUCCESSO! 🎉');
 }
 
 runTests();

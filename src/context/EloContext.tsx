@@ -226,6 +226,7 @@ export const EloProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const prevMatchesLengthRef = useRef<number>(0);
   const activeLeagueIdRef = useRef<string>('');
   const unsubscribeLeagueRef = useRef<(() => void) | null>(null);
+  const isSavingMatchRef = useRef<boolean>(false);
 
   // Giocatore associato all'utente loggato
   const associatedPlayer = useMemo(() => {
@@ -1327,12 +1328,29 @@ export const EloProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: 'A ping pong non esiste il pareggio!' };
     }
 
-    const p1 = players.find((p) => p.id === p1Id);
-    const p2 = players.find((p) => p.id === p2Id);
-
-    if (!p1 || !p2) {
-      return { success: false, error: 'Giocatori non trovati!' };
+    if (isSavingMatchRef.current) {
+      return { success: false, error: 'Salvataggio della partita già in corso, attendi...' };
     }
+
+    // Deduplica anti-doppia registrazione accidentale o multi-client (< 45s, stessi giocatori e punteggio)
+    const isDuplicate = matches.some(
+      (m) =>
+        ((m.player1Id === p1Id && m.player2Id === p2Id && m.score1 === score1 && m.score2 === score2) ||
+         (m.player1Id === p2Id && m.player2Id === p1Id && m.score1 === score2 && m.score2 === score1)) &&
+        Date.now() - m.timestamp < 45000
+    );
+    if (isDuplicate) {
+      return { success: false, error: 'Questa partita risulta già registrata pochi istanti fa!' };
+    }
+
+    isSavingMatchRef.current = true;
+    try {
+      const p1 = players.find((p) => p.id === p1Id);
+      const p2 = players.find((p) => p.id === p2Id);
+
+      if (!p1 || !p2) {
+        return { success: false, error: 'Giocatori non trovati!' };
+      }
 
     const isP1Winner = score1 > score2;
     const winner = isP1Winner ? p1 : p2;
@@ -1541,7 +1559,10 @@ export const EloProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     }
 
-    return { success: true, match: newMatch };
+      return { success: true, match: newMatch };
+    } finally {
+      isSavingMatchRef.current = false;
+    }
   };
 
   const undoLastMatch = async (): Promise<boolean> => {

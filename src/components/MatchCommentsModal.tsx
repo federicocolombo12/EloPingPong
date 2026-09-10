@@ -39,28 +39,21 @@ export const MatchCommentsModal: React.FC<MatchCommentsModalProps> = ({
   if (!match) return null;
 
   const { associatedPlayer } = useElo();
-  const [selectedPlayerId, setSelectedPlayerId] = useState<string>(
-    associatedPlayer?.id || players[0]?.id || ''
-  );
   const [commentText, setCommentText] = useState('');
   const [attachedGif, setAttachedGif] = useState<string | null>(null);
   const [showGifPicker, setShowGifPicker] = useState(false);
-
-  useEffect(() => {
-    if (associatedPlayer) {
-      setSelectedPlayerId(associatedPlayer.id);
-    } else if (players.length > 0 && !selectedPlayerId) {
-      setSelectedPlayerId(players[0].id);
-    }
-  }, [associatedPlayer, players]);
 
   const p1 = players.find((p) => p.id === match.player1Id);
   const p2 = players.find((p) => p.id === match.player2Id);
   const isP1Winner = match.winnerId === match.player1Id;
 
   const handleSendComment = () => {
+    if (!associatedPlayer) {
+      alert('Seleziona prima il tuo profilo personale (in alto a destra) per commentare!');
+      return;
+    }
     if (!commentText.trim() && !attachedGif) return;
-    onAddComment(match.id, selectedPlayerId, commentText.trim(), attachedGif || undefined);
+    onAddComment(match.id, associatedPlayer.id, commentText.trim(), attachedGif || undefined);
     setCommentText('');
     setAttachedGif(null);
   };
@@ -134,12 +127,18 @@ export const MatchCommentsModal: React.FC<MatchCommentsModalProps> = ({
               {REACTION_EMOJIS.map((emoji) => {
                 const reactedPlayerIds = match.reactions?.[emoji] || [];
                 const count = reactedPlayerIds.length;
-                const hasReacted = reactedPlayerIds.includes(selectedPlayerId);
+                const hasReacted = !!associatedPlayer && reactedPlayerIds.includes(associatedPlayer.id);
 
                 return (
                   <TouchableOpacity
                     key={emoji}
-                    onPress={() => onAddReaction(match.id, emoji, selectedPlayerId)}
+                    onPress={() => {
+                      if (!associatedPlayer) {
+                        alert('Seleziona prima il tuo profilo personale (in alto a destra) per reagire!');
+                        return;
+                      }
+                      onAddReaction(match.id, emoji, associatedPlayer.id);
+                    }}
                     style={[styles.reactionPill, hasReacted && styles.reactionPillActive]}
                   >
                     <Text style={styles.reactionEmoji}>{emoji}</Text>
@@ -217,39 +216,37 @@ export const MatchCommentsModal: React.FC<MatchCommentsModalProps> = ({
             </View>
           )}
 
-          {/* SELETTORE AUTORE E BARRA DI SCRITTURA */}
+          {/* IDENTITÀ UTENTE E BARRA DI SCRITTURA */}
           <View style={styles.inputArea}>
-            <View style={styles.authorPickerRow}>
-              <Text style={styles.authorPickerLabel}>Commenta come:</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {players.map((p) => {
-                  const isSelected = p.id === selectedPlayerId;
-                  const playerColor = p.color || '#3B82F6';
-                  return (
-                    <TouchableOpacity
-                      key={p.id}
-                      onPress={() => setSelectedPlayerId(p.id)}
-                      style={[
-                        styles.authorChip,
-                        isSelected && {
-                          backgroundColor: `${playerColor}25`,
-                          borderColor: playerColor,
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.authorChipText,
-                          isSelected && { color: playerColor, fontWeight: '900' },
-                        ]}
-                      >
-                        {p.avatar} {p.name}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </View>
+            {associatedPlayer ? (
+              <View style={styles.authorBadgeRow}>
+                <Text style={styles.authorPickerLabel}>Commenti come:</Text>
+                <View
+                  style={[
+                    styles.authorChipLocked,
+                    {
+                      backgroundColor: `${associatedPlayer.color || '#3B82F6'}20`,
+                      borderColor: associatedPlayer.color || '#3B82F6',
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.authorChipText,
+                      { color: associatedPlayer.color || '#3B82F6', fontWeight: '900' },
+                    ]}
+                  >
+                    {associatedPlayer.avatar} {associatedPlayer.name} 🔒
+                  </Text>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.authorWarningBox}>
+                <Text style={styles.authorWarningText}>
+                  ⚠️ Seleziona il tuo profilo dal menu in alto per commentare con la tua identità!
+                </Text>
+              </View>
+            )}
 
             <View style={styles.composerRow}>
               <TextInput
@@ -522,7 +519,7 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(255, 255, 255, 0.08)',
     paddingTop: 8,
   },
-  authorPickerRow: {
+  authorBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
@@ -532,6 +529,26 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     marginRight: 6,
+  },
+  authorChipLocked: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  authorWarningBox: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.25)',
+  },
+  authorWarningText: {
+    color: '#F87171',
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   authorChip: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',

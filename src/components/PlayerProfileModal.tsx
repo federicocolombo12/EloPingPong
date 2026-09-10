@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Modal,
   ScrollView,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useElo } from '../context/EloContext';
 import { STARTING_COINS } from '../core/constants';
 import { getPlayerActiveMilestone, getStreakDisplay, getWinRate } from '../core/elo';
 import { getBorderCardStyle } from '../core/shop';
@@ -38,12 +39,34 @@ export const PlayerProfileModal: React.FC<PlayerProfileModalProps> = ({
 }) => {
   if (!player) return null;
 
+  const { associatedPlayer } = useElo();
+
   const winRate = getWinRate(player.wins, player.losses);
   const streak = getStreakDisplay(player.currentStreak);
   const milestone = getPlayerActiveMilestone(player.elo);
   const pColor = player.color || Colors.primary;
   const coins = player.coins !== undefined ? player.coins : STARTING_COINS;
   const trophies = getPlayerTrophies(player.id, allPlayers, allMatches);
+
+  // Scontri diretti tra il giocatore ispezionato e l'utente collegato
+  const directMatches = useMemo(() => {
+    if (!associatedPlayer || associatedPlayer.id === player.id) return [];
+    return allMatches.filter(
+      (m) =>
+        (m.player1Id === player.id && m.player2Id === associatedPlayer.id) ||
+        (m.player2Id === player.id && m.player1Id === associatedPlayer.id)
+    );
+  }, [allMatches, player.id, associatedPlayer]);
+
+  const myWins = directMatches.filter((m) => m.winnerId === associatedPlayer?.id).length;
+  const theirWins = directMatches.filter((m) => m.winnerId === player.id).length;
+
+  // Ultime 4 partite del giocatore
+  const recentMatches = useMemo(() => {
+    return allMatches
+      .filter((m) => m.player1Id === player.id || m.player2Id === player.id)
+      .slice(0, 4);
+  }, [allMatches, player.id]);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -165,6 +188,65 @@ export const PlayerProfileModal: React.FC<PlayerProfileModalProps> = ({
                       <Text style={styles.tagText}>{tag}</Text>
                     </View>
                   ))}
+                </View>
+              )}
+
+              {/* SCONTRI DIRETTI CON L'UTENTE LOGGATO */}
+              {associatedPlayer && associatedPlayer.id !== player.id && (
+                <View style={styles.directMatchupSection}>
+                  <Text style={styles.directMatchupTitle}>
+                    ⚔️ Scontri Diretti Con Te ({associatedPlayer.name})
+                  </Text>
+                  <View style={styles.directScoreBox}>
+                    <View style={styles.directScoreCol}>
+                      <Text style={styles.directScoreLabel}>TU ({associatedPlayer.name})</Text>
+                      <Text style={[styles.directScoreNum, { color: '#38BDF8' }]}>{myWins}</Text>
+                    </View>
+                    <Text style={styles.directScoreDivider}>vs</Text>
+                    <View style={styles.directScoreCol}>
+                      <Text style={styles.directScoreLabel}>{player.name.toUpperCase()}</Text>
+                      <Text style={[styles.directScoreNum, { color: pColor }]}>{theirWins}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.directTotalText}>
+                    {directMatches.length === 0
+                      ? 'Nessun match disputato tra voi finora.'
+                      : `Totale: ${directMatches.length} ${directMatches.length === 1 ? 'partita disputata' : 'partite disputate'}`}
+                  </Text>
+                </View>
+              )}
+
+              {/* ULTIME PARTITE DISPUTATE */}
+              {recentMatches.length > 0 && (
+                <View style={styles.recentMatchesSection}>
+                  <Text style={styles.recentMatchesTitle}>📜 Ultime Partite Disputate:</Text>
+                  {recentMatches.map((m) => {
+                    const isP1 = m.player1Id === player.id;
+                    const opponentId = isP1 ? m.player2Id : m.player1Id;
+                    const opponent = allPlayers.find((p) => p.id === opponentId);
+                    const myScore = isP1 ? m.score1 : m.score2;
+                    const oppScore = isP1 ? m.score2 : m.score1;
+                    const won = m.winnerId === player.id;
+                    const dateStr = new Date(m.timestamp).toLocaleDateString([], { day: '2-digit', month: 'short' });
+
+                    return (
+                      <View key={m.id} style={styles.recentMatchRow}>
+                        <View style={[styles.recentMatchResultBadge, won ? styles.badgeWin : styles.badgeLoss]}>
+                          <Text style={styles.recentMatchResultText}>{won ? 'V' : 'P'}</Text>
+                        </View>
+                        <Text style={styles.recentMatchOpponent} numberOfLines={1}>
+                          vs {opponent?.avatar || '👤'} {opponent?.name || 'Avversario'}
+                        </Text>
+                        <Text style={styles.recentMatchScore}>
+                          {myScore} - {oppScore}
+                        </Text>
+                        <Text style={[styles.recentMatchDelta, won ? styles.deltaTextWin : styles.deltaTextLoss]}>
+                          {m.isFriendly ? '🤝 0' : won ? `+${m.winnerEloDelta ?? m.eloDelta}` : `-${m.loserEloDelta ?? m.eloDelta}`}
+                        </Text>
+                        <Text style={styles.recentMatchDate}>{dateStr}</Text>
+                      </View>
+                    );
+                  })}
                 </View>
               )}
             </View>
@@ -459,5 +541,126 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontSize: 12,
     fontWeight: '800',
+  },
+  directMatchupSection: {
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  directMatchupTitle: {
+    color: '#38BDF8',
+    fontSize: 12,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  directScoreBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(56, 189, 248, 0.06)',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.2)',
+    gap: 16,
+  },
+  directScoreCol: {
+    alignItems: 'center',
+  },
+  directScoreLabel: {
+    color: Colors.textMuted,
+    fontSize: 10,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  directScoreNum: {
+    fontSize: 22,
+    fontWeight: '900',
+  },
+  directScoreDivider: {
+    color: Colors.textMuted,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  directTotalText: {
+    color: Colors.textMuted,
+    fontSize: 10,
+    textAlign: 'center',
+    marginTop: 6,
+  },
+  recentMatchesSection: {
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  recentMatchesTitle: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  recentMatchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    marginBottom: 6,
+    gap: 8,
+  },
+  recentMatchResultBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeWin: {
+    backgroundColor: 'rgba(52, 211, 153, 0.2)',
+    borderWidth: 1,
+    borderColor: '#34D399',
+  },
+  badgeLoss: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    borderWidth: 1,
+    borderColor: '#EF4444',
+  },
+  recentMatchResultText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: Colors.textPrimary,
+  },
+  recentMatchOpponent: {
+    flex: 1,
+    color: Colors.textPrimary,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  recentMatchScore: {
+    color: Colors.textSecondary,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  recentMatchDelta: {
+    fontSize: 11,
+    fontWeight: '800',
+    minWidth: 40,
+    textAlign: 'right',
+  },
+  deltaTextWin: {
+    color: '#34D399',
+  },
+  deltaTextLoss: {
+    color: '#EF4444',
+  },
+  recentMatchDate: {
+    color: Colors.textMuted,
+    fontSize: 9,
+    minWidth: 42,
+    textAlign: 'right',
   },
 });

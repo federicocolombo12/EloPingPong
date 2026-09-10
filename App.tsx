@@ -141,6 +141,17 @@ function MainApp() {
           </View>
         </TouchableOpacity>
 
+        <TouchableOpacity
+          onPress={() => {
+            soundEffects.playButtonTap();
+            setIsReportModalVisible(true);
+          }}
+          style={styles.headerReportPill}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.headerReportText}>🚨 Segnala</Text>
+        </TouchableOpacity>
+
         {associatedPlayer && (
           <TouchableOpacity
             onPress={() => {

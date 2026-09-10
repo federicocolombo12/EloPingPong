@@ -138,12 +138,48 @@ export function calculateSpecialTrophies(
   const list = Object.values(aggregates);
   const activePlayers = list.filter((a) => a.liveMatchesCount > 0);
 
+  // Soglia minima di partite live per poter vincere un trofeo per media:
+  // Se la lega ha giocatori con almeno 2 partite live, richiediamo >= 2 partite per evitare vincite "one-shot"
+  // Altrimenti fallback a 1 se qualcuno ha giocato almeno 1 partita live.
+  const maxLiveMatches = Math.max(0, ...list.map((a) => a.liveMatchesCount));
+  const minLiveMatches = maxLiveMatches >= 2 ? 2 : (maxLiveMatches >= 1 ? 1 : 0);
+  const eligiblePlayers = list.filter((a) => a.liveMatchesCount >= minLiveMatches && a.liveMatchesCount > 0);
+
+  function getBestByAverage(
+    metricGetter: (a: PlayerStatsAggregate) => number,
+    minCount: number = 1
+  ): { best: PlayerStatsAggregate | null; avg: number } {
+    let best: PlayerStatsAggregate | null = null;
+    let maxAvg = -1;
+    let maxTotal = -1;
+
+    // Se ci sono player con la soglia minima di partite, cerchiamo tra loro; altrimenti tra chiunque abbia liveMatchesCount > 0
+    const pool = eligiblePlayers.length > 0 ? eligiblePlayers : activePlayers;
+
+    for (const a of pool) {
+      const total = metricGetter(a);
+      if (total < minCount) continue;
+      const avg = a.liveMatchesCount > 0 ? total / a.liveMatchesCount : 0;
+
+      // Se la media è superiore, o a parità di media il totale è superiore
+      if (avg > maxAvg || (Math.abs(avg - maxAvg) < 0.0001 && total > maxTotal)) {
+        maxAvg = avg;
+        maxTotal = total;
+        best = a;
+      }
+    }
+
+    return { best, avg: maxAvg >= 0 ? maxAvg : 0 };
+  }
+
   const trophies: SpecialTrophy[] = [];
 
   // 1. "Buona la prima" (più alta % prime battute a segno)
-  let bestServer = activePlayers.length > 0 ? activePlayers[0] : null;
-  for (const a of activePlayers) {
-    if (a.totalServes >= 10 && a.serveSuccessRate > (bestServer?.serveSuccessRate ?? 0)) {
+  const serverPool = eligiblePlayers.length > 0 ? eligiblePlayers : activePlayers;
+  let bestServer = serverPool.length > 0 ? serverPool[0] : null;
+  const minServes = serverPool.some((a) => a.totalServes >= 10) ? 10 : 5;
+  for (const a of serverPool) {
+    if (a.totalServes >= minServes && a.serveSuccessRate > (bestServer?.serveSuccessRate ?? 0)) {
       bestServer = a;
     }
   }
@@ -155,18 +191,13 @@ export function calculateSpecialTrophies(
     winnerPlayerId: bestServer?.playerId,
     winnerPlayerName: bestServer?.player.name,
     winnerPlayerAvatar: bestServer?.player.avatar,
-    statValue: bestServer ? `${bestServer.serveSuccessRate}% prime a segno` : '---',
+    statValue: bestServer ? `${bestServer.serveSuccessRate}% prime a segno (${bestServer.totalServes} serv in ${bestServer.liveMatchesCount} live)` : '---',
     description: 'Assegnato al giocatore con la più alta percentuale di battute valide senza commettere falli.',
   });
 
-  // 2. "Salvato in corner" (maggior numero di spigoli)
-  let bestEdges = list.length > 0 ? list[0] : null;
-  for (const a of list) {
-    if (a.edges > (bestEdges?.edges ?? -1)) {
-      bestEdges = a;
-    }
-  }
-  const hasEdges = (bestEdges?.edges ?? 0) > 0;
+  // 2. "Salvato in corner" (media spigoli per partita live)
+  const { best: bestEdges, avg: edgesAvg } = getBestByAverage((a) => a.edges);
+  const hasEdges = !!bestEdges && bestEdges.edges > 0;
   trophies.push({
     id: 'corner_saver',
     title: 'Salvato in corner',
@@ -175,18 +206,13 @@ export function calculateSpecialTrophies(
     winnerPlayerId: hasEdges ? bestEdges?.playerId : undefined,
     winnerPlayerName: hasEdges ? bestEdges?.player.name : undefined,
     winnerPlayerAvatar: hasEdges ? bestEdges?.player.avatar : undefined,
-    statValue: hasEdges ? `${bestEdges?.edges} spigoli vincenti` : '0 spigoli',
+    statValue: hasEdges ? `${edgesAvg.toFixed(1)}/m (${bestEdges?.edges} in ${bestEdges?.liveMatchesCount} live)` : '0 spigoli',
     description: 'Assegnato al giocatore che ha beffato più volte l\'avversario colpendo lo spigolo del tavolo.',
   });
 
-  // 3. "Culo sfondato" (più punti da spigoli + net)
-  let bestLuck = list.length > 0 ? list[0] : null;
-  for (const a of list) {
-    if (a.luckPoints > (bestLuck?.luckPoints ?? -1)) {
-      bestLuck = a;
-    }
-  }
-  const hasLuck = (bestLuck?.luckPoints ?? 0) > 0;
+  // 3. "Culo sfondato" (media punti da spigoli + net per partita live)
+  const { best: bestLuck, avg: luckAvg } = getBestByAverage((a) => a.luckPoints);
+  const hasLuck = !!bestLuck && bestLuck.luckPoints > 0;
   trophies.push({
     id: 'lucky_bastard',
     title: 'Culo sfondato',
@@ -195,18 +221,13 @@ export function calculateSpecialTrophies(
     winnerPlayerId: hasLuck ? bestLuck?.playerId : undefined,
     winnerPlayerName: hasLuck ? bestLuck?.player.name : undefined,
     winnerPlayerAvatar: hasLuck ? bestLuck?.player.avatar : undefined,
-    statValue: hasLuck ? `${bestLuck?.luckPoints} pt fortuna (${bestLuck?.edges} spigoli, ${bestLuck?.nets} net)` : '0 pt fortuna',
-    description: 'Assegnato a colui che ha collezionato il record assoluto di punti casuali tra retine e spigoli.',
+    statValue: hasLuck ? `${luckAvg.toFixed(1)} pt/m (${bestLuck?.luckPoints} pt: ${bestLuck?.edges} spig, ${bestLuck?.nets} net)` : '0 pt fortuna',
+    description: 'Assegnato a colui che ha collezionato il record di punti casuali per match tra retine e spigoli.',
   });
 
-  // 4. "Senza mani" (più errori commessi in battuta)
-  let mostFaults = list.length > 0 ? list[0] : null;
-  for (const a of list) {
-    if (a.serveErrors > (mostFaults?.serveErrors ?? -1)) {
-      mostFaults = a;
-    }
-  }
-  const hasFaults = (mostFaults?.serveErrors ?? 0) > 0;
+  // 4. "Senza mani" (media errori commessi in battuta per partita live)
+  const { best: mostFaults, avg: faultsAvg } = getBestByAverage((a) => a.serveErrors);
+  const hasFaults = !!mostFaults && mostFaults.serveErrors > 0;
   trophies.push({
     id: 'no_hands',
     title: 'Senza mani',
@@ -215,18 +236,13 @@ export function calculateSpecialTrophies(
     winnerPlayerId: hasFaults ? mostFaults?.playerId : undefined,
     winnerPlayerName: hasFaults ? mostFaults?.player.name : undefined,
     winnerPlayerAvatar: hasFaults ? mostFaults?.player.avatar : undefined,
-    statValue: hasFaults ? `${mostFaults?.serveErrors} falli al servizio` : '0 falli',
+    statValue: hasFaults ? `${faultsAvg.toFixed(1)} falli/m (${mostFaults?.serveErrors} in ${mostFaults?.liveMatchesCount} live)` : '0 falli',
     description: 'Assegnato a colui che regala più punti agli avversari sbagliando la battuta da solo.',
   });
 
-  // 5. "Re dello smash" (maggior numero di schiacciate vincenti)
-  let bestSmash = list.length > 0 ? list[0] : null;
-  for (const a of list) {
-    if (a.smashes > (bestSmash?.smashes ?? -1)) {
-      bestSmash = a;
-    }
-  }
-  const hasSmash = (bestSmash?.smashes ?? 0) > 0;
+  // 5. "Re dello smash" (media schiacciate vincenti per partita live)
+  const { best: bestSmash, avg: smashAvg } = getBestByAverage((a) => a.smashes);
+  const hasSmash = !!bestSmash && bestSmash.smashes > 0;
   trophies.push({
     id: 'smash_king',
     title: 'Re dello smash',
@@ -235,18 +251,13 @@ export function calculateSpecialTrophies(
     winnerPlayerId: hasSmash ? bestSmash?.playerId : undefined,
     winnerPlayerName: hasSmash ? bestSmash?.player.name : undefined,
     winnerPlayerAvatar: hasSmash ? bestSmash?.player.avatar : undefined,
-    statValue: hasSmash ? `${bestSmash?.smashes} schiacciate vincenti` : '0 smash',
-    description: 'Assegnato al giocatore più aggressivo che chiude i punti con bordate imparabili.',
+    statValue: hasSmash ? `${smashAvg.toFixed(1)}/m (${bestSmash?.smashes} in ${bestSmash?.liveMatchesCount} live)` : '0 smash',
+    description: 'Assegnato al giocatore più aggressivo che chiude i punti con bordate imparabili per partita.',
   });
 
-  // 6. "Re dell'Ace" (maggior numero di ace vincenti)
-  let bestAce = list.length > 0 ? list[0] : null;
-  for (const a of list) {
-    if (a.aces > (bestAce?.aces ?? -1)) {
-      bestAce = a;
-    }
-  }
-  const hasAces = (bestAce?.aces ?? 0) > 0;
+  // 6. "Re dell'Ace" (media ace vincenti per partita live)
+  const { best: bestAce, avg: aceAvg } = getBestByAverage((a) => a.aces);
+  const hasAces = !!bestAce && bestAce.aces > 0;
   trophies.push({
     id: 'ace_king',
     title: "Re dell'Ace",
@@ -255,18 +266,13 @@ export function calculateSpecialTrophies(
     winnerPlayerId: hasAces ? bestAce?.playerId : undefined,
     winnerPlayerName: hasAces ? bestAce?.player.name : undefined,
     winnerPlayerAvatar: hasAces ? bestAce?.player.avatar : undefined,
-    statValue: hasAces ? `${bestAce?.aces} ace vincenti` : '0 ace',
-    description: 'Assegnato al battitore più letale che mette a segno ace diretti senza lasciare scampo all\'avversario.',
+    statValue: hasAces ? `${aceAvg.toFixed(1)}/m (${bestAce?.aces} in ${bestAce?.liveMatchesCount} live)` : '0 ace',
+    description: 'Assegnato al battitore più letale che mette a segno ace diretti per incontro.',
   });
 
-  // 7. "Cuore d'Acciaio" (maggior numero di match point salvati)
-  let bestMpSaver = list.length > 0 ? list[0] : null;
-  for (const a of list) {
-    if (a.matchPointsSaved > (bestMpSaver?.matchPointsSaved ?? -1)) {
-      bestMpSaver = a;
-    }
-  }
-  const hasMpSaved = (bestMpSaver?.matchPointsSaved ?? 0) > 0;
+  // 7. "Cuore d'Acciaio" (media match point salvati per partita live)
+  const { best: bestMpSaver, avg: mpAvg } = getBestByAverage((a) => a.matchPointsSaved);
+  const hasMpSaved = !!bestMpSaver && bestMpSaver.matchPointsSaved > 0;
   trophies.push({
     id: 'match_point_saver',
     title: "Cuore d'Acciaio",
@@ -275,18 +281,13 @@ export function calculateSpecialTrophies(
     winnerPlayerId: hasMpSaved ? bestMpSaver?.playerId : undefined,
     winnerPlayerName: hasMpSaved ? bestMpSaver?.player.name : undefined,
     winnerPlayerAvatar: hasMpSaved ? bestMpSaver?.player.avatar : undefined,
-    statValue: hasMpSaved ? `${bestMpSaver?.matchPointsSaved} match point annullati` : '0 MP salvati',
+    statValue: hasMpSaved ? `${mpAvg.toFixed(1)}/m (${bestMpSaver?.matchPointsSaved} in ${bestMpSaver?.liveMatchesCount} live)` : '0 MP salvati',
     description: 'Assegnato al maestro delle rimonte impossibili che ha annullato più match point avversari.',
   });
 
-  // 8. "Difesa d'Acciaio" (più punti strappati in difesa)
-  let bestDefense = list.length > 0 ? list[0] : null;
-  for (const a of list) {
-    if (a.defenses > (bestDefense?.defenses ?? -1)) {
-      bestDefense = a;
-    }
-  }
-  const hasDefense = (bestDefense?.defenses ?? 0) > 0;
+  // 8. "Difesa d'Acciaio" (media punti strappati in difesa per partita live)
+  const { best: bestDefense, avg: defAvg } = getBestByAverage((a) => a.defenses);
+  const hasDefense = !!bestDefense && bestDefense.defenses > 0;
   trophies.push({
     id: 'iron_defense',
     title: "Difesa d'Acciaio",
@@ -295,18 +296,13 @@ export function calculateSpecialTrophies(
     winnerPlayerId: hasDefense ? bestDefense?.playerId : undefined,
     winnerPlayerName: hasDefense ? bestDefense?.player.name : undefined,
     winnerPlayerAvatar: hasDefense ? bestDefense?.player.avatar : undefined,
-    statValue: hasDefense ? `${bestDefense?.defenses} punti in difesa` : '0 difese',
+    statValue: hasDefense ? `${defAvg.toFixed(1)}/m (${bestDefense?.defenses} in ${bestDefense?.liveMatchesCount} live)` : '0 difese',
     description: 'Assegnato al giocatore capace di recuperi impossibili e difese strenue che ribaltano lo scambio.',
   });
 
-  // 9. "Pura Classe" (più punti stile realizzati)
-  let bestStyle = list.length > 0 ? list[0] : null;
-  for (const a of list) {
-    if (a.stylePoints > (bestStyle?.stylePoints ?? -1)) {
-      bestStyle = a;
-    }
-  }
-  const hasStyle = (bestStyle?.stylePoints ?? 0) > 0;
+  // 9. "Pura Classe" (media punti stile realizzati per partita live)
+  const { best: bestStyle, avg: styleAvg } = getBestByAverage((a) => a.stylePoints);
+  const hasStyle = !!bestStyle && bestStyle.stylePoints > 0;
   trophies.push({
     id: 'style_master',
     title: 'Pura Classe',
@@ -315,18 +311,13 @@ export function calculateSpecialTrophies(
     winnerPlayerId: hasStyle ? bestStyle?.playerId : undefined,
     winnerPlayerName: hasStyle ? bestStyle?.player.name : undefined,
     winnerPlayerAvatar: hasStyle ? bestStyle?.player.avatar : undefined,
-    statValue: hasStyle ? `${bestStyle?.stylePoints} pt stile` : '0 pt stile',
+    statValue: hasStyle ? `${styleAvg.toFixed(1)} pt/m (${bestStyle?.stylePoints} in ${bestStyle?.liveMatchesCount} live)` : '0 pt stile',
     description: 'Assegnato al giocatore che delizia il pubblico con colpi spettacolari di puro stile e classe.',
   });
 
-  // 9. "Mia!" (più contese iniziali vinte)
-  let bestContestWon = list.length > 0 ? list[0] : null;
-  for (const a of list) {
-    if (a.ballContestsWon > (bestContestWon?.ballContestsWon ?? -1)) {
-      bestContestWon = a;
-    }
-  }
-  const hasContestWon = (bestContestWon?.ballContestsWon ?? 0) > 0;
+  // 10. "Mia!" (media contese iniziali vinte per partita live)
+  const { best: bestContestWon, avg: contestWonAvg } = getBestByAverage((a) => a.ballContestsWon);
+  const hasContestWon = !!bestContestWon && bestContestWon.ballContestsWon > 0;
   trophies.push({
     id: 'ball_contest_master',
     title: 'Mia!',
@@ -335,18 +326,13 @@ export function calculateSpecialTrophies(
     winnerPlayerId: hasContestWon ? bestContestWon?.playerId : undefined,
     winnerPlayerName: hasContestWon ? bestContestWon?.player.name : undefined,
     winnerPlayerAvatar: hasContestWon ? bestContestWon?.player.avatar : undefined,
-    statValue: hasContestWon ? `${bestContestWon?.ballContestsWon} contese vinte` : '0 contese',
-    description: 'Assegnato al giocatore che ha vinto più volte la contesa iniziale "per la palla" conquistando il primo servizio.',
+    statValue: hasContestWon ? `${contestWonAvg.toFixed(1)}/m (${bestContestWon?.ballContestsWon} in ${bestContestWon?.liveMatchesCount} live)` : '0 contese',
+    description: 'Assegnato al giocatore che ha vinto più volte la contesa iniziale conquistando il primo servizio.',
   });
 
-  // 10. "Tua!" (più contese iniziali perse / cedute)
-  let mostContestLost = list.length > 0 ? list[0] : null;
-  for (const a of list) {
-    if (a.ballContestsLost > (mostContestLost?.ballContestsLost ?? -1)) {
-      mostContestLost = a;
-    }
-  }
-  const hasContestLost = (mostContestLost?.ballContestsLost ?? 0) > 0;
+  // 11. "Tua!" (media contese iniziali perse / cedute per partita live)
+  const { best: mostContestLost, avg: contestLostAvg } = getBestByAverage((a) => a.ballContestsLost);
+  const hasContestLost = !!mostContestLost && mostContestLost.ballContestsLost > 0;
   trophies.push({
     id: 'ball_contest_loser',
     title: 'Tua!',
@@ -355,11 +341,11 @@ export function calculateSpecialTrophies(
     winnerPlayerId: hasContestLost ? mostContestLost?.playerId : undefined,
     winnerPlayerName: hasContestLost ? mostContestLost?.player.name : undefined,
     winnerPlayerAvatar: hasContestLost ? mostContestLost?.player.avatar : undefined,
-    statValue: hasContestLost ? `${mostContestLost?.ballContestsLost} contese cedute` : '0 contese',
+    statValue: hasContestLost ? `${contestLostAvg.toFixed(1)}/m (${mostContestLost?.ballContestsLost} in ${mostContestLost?.liveMatchesCount} live)` : '0 contese',
     description: 'Assegnato al giocatore galante (o distratto) che ha perso più volte la contesa iniziale per il servizio.',
   });
 
-  // 11. "Cucchiaio di legno" (ultimo classificato per Elo)
+  // 12. "Cucchiaio di legno" (ultimo classificato per Elo)
   if (players.length >= 2) {
     const sortedByElo = [...players].sort((a, b) => a.elo - b.elo);
     const lastPlayer = sortedByElo[0];

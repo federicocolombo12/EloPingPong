@@ -214,7 +214,7 @@ export const FullScreenLiveMatchModal: React.FC<FullScreenLiveMatchModalProps> =
 
   // Riunione Bet State (LUL Coins)
   const [isBetOpen, setIsBetOpen] = useState(false);
-  const [betMode, setBetMode] = useState<'pre_match' | 'live_dynamic'>('live_dynamic');
+  const [betMode, setBetMode] = useState<'pre_match' | 'live_dynamic'>('pre_match');
   const [betTarget, setBetTarget] = useState<1 | 2>(1);
   const [betAmount, setBetAmount] = useState<number>(25);
   const [isSubmittingBet, setIsSubmittingBet] = useState(false);
@@ -1394,6 +1394,9 @@ export const FullScreenLiveMatchModal: React.FC<FullScreenLiveMatchModalProps> =
             style={[styles.circularBetBtn, isBetOpen && styles.circularBetBtnActive]}
             onPress={() => {
               soundEffects.playCoinSound();
+              if (!isBetOpen && score1 + score2 < 6) {
+                setBetMode('pre_match');
+              }
               setIsBetOpen(!isBetOpen);
             }}
             activeOpacity={0.85}
