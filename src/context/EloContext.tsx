@@ -29,7 +29,7 @@ import {
   validateBetPlacement,
 } from '../core/betting';
 import { openMysteryBox, SHOP_ITEMS, spinLuckyWheel, WheelSpinOutcome } from '../core/shop';
-import { calculatePlayerAchievements } from '../core/achievements';
+import { calculatePlayerAchievements, sanitizePlayerTags } from '../core/achievements';
 import { soundEffects } from '../utils/soundEffects';
 import { isFirebaseConfigured } from '../core/firebaseConfig';
 import {
@@ -290,6 +290,7 @@ export const EloProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const mappedPlayers = rawPlayers.map((p) => ({
         ...p,
         coins: p.coins !== undefined ? p.coins : STARTING_COINS,
+        tags: sanitizePlayerTags(p),
       }));
 
       // Segnalazione rep_1788965886886_fhbmn: Controllo se l'utente ha superato una soglia mentre era offline

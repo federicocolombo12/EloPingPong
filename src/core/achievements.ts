@@ -1,4 +1,5 @@
 import { Player, Match } from './types';
+import { SHOP_ITEMS } from './shop';
 
 export type AchievementTierLevel = 1 | 2 | 3 | 4 | 5 | 6;
 
@@ -252,3 +253,60 @@ export function calculatePlayerAchievements(
     };
   });
 }
+
+/**
+ * Restituisce l'elenco dei soli riconoscimenti/tag legittimi che il giocatore possiede:
+ * - Titoli acquistati nello shop
+ * - Trofei acquistati nello shop
+ * - Achievement effettivamente raggiunti e riscattati (con badge tier)
+ * - Tag personalizzati coniati con il gettone
+ */
+export function getValidPlayerRecognitions(player: Player): string[] {
+  const valid: string[] = [];
+
+  // 1. Titoli acquistati nello shop (categoria title)
+  SHOP_ITEMS.filter((it) => it.category === 'title' && player.inventory?.includes(it.id)).forEach((it) => {
+    valid.push(it.name);
+  });
+
+  // 2. Trofei acquistati nello shop (categoria trophy)
+  SHOP_ITEMS.filter((it) => it.category === 'trophy' && (player.trophyShowcase?.includes(it.id) || player.inventory?.includes(it.id))).forEach((it) => {
+    valid.push(it.trophyBadge || it.name);
+  });
+
+  // Badge speciali vinti (es. Pacco Sorpresa)
+  if (player.inventory?.includes('badge_box')) {
+    valid.push('📦 Spacchettatore Seriale');
+  }
+
+  // 3. Achievement effettivamente riscattati dal giocatore (con badge di livello)
+  if (player.claimedAchievements) {
+    Object.entries(player.claimedAchievements).forEach(([achId, tierLevel]) => {
+      const ach = ACHIEVEMENTS.find((a) => a.id === achId);
+      const tier = ach?.tiers.find((t) => t.level === tierLevel);
+      if (ach && tier) {
+        valid.push(`${tier.badge} ${ach.name} (${tier.name})`);
+      }
+    });
+  }
+
+  // 4. Tag personalizzati coniati con il gettone del Bazar
+  if (player.coinedTags && Array.isArray(player.coinedTags)) {
+    valid.push(...player.coinedTags);
+  }
+
+  return valid;
+}
+
+/**
+ * Pulisce i tag di un giocatore rimuovendo categoricamente qualsiasi tag
+ * autoassegnato che non sia stato legittimamente guadagnato o acquistato.
+ */
+export function sanitizePlayerTags(player: Player): string[] {
+  if (!player.tags || !Array.isArray(player.tags) || player.tags.length === 0) {
+    return [];
+  }
+  const valid = getValidPlayerRecognitions(player);
+  return player.tags.filter((t) => valid.includes(t));
+}
+

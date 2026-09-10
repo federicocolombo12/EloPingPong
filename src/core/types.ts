@@ -42,6 +42,7 @@ export interface Player {
   lastDailyRewardAt?: number; // Timestamp dell'ultimo bonus giornaliero (+50 coins) riscattato
   lastDailySpinAt?: number; // Timestamp dell'ultimo giro gratuito alla ruota della fortuna
   claimedAchievements?: Record<string, number>; // achievementId -> max tier level claimed (1..6)
+  coinedTags?: string[]; // Tag personalizzati coniati con il gettone del Bazar
 }
 
 export type ShopItemCategory =

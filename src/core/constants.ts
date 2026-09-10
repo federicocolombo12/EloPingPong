@@ -1,4 +1,4 @@
-import { Player } from './types';
+import { Player, CustomTag } from './types';
 
 export const DEFAULT_K_FACTOR = 32;
 export const DEFAULT_INITIAL_ELO = 1200;
@@ -388,13 +388,7 @@ export const MEME_GIFS: MemeGif[] = [
   },
 ];
 
-export const DEFAULT_CUSTOM_TAGS = [
-  { id: 'tag_sniper', emoji: '🎯', text: 'Cecchino del Taglio' },
-  { id: 'tag_wall', emoji: '🧱', text: 'Muro di Gomma' },
-  { id: 'tag_lucky', emoji: '🍀', text: 'Baciato dalla Dea' },
-  { id: 'tag_excuses', emoji: '🤡', text: 'Colpa del Vento' },
-  { id: 'tag_smash', emoji: '💥', text: 'Cannoniere' },
-];
+export const DEFAULT_CUSTOM_TAGS: CustomTag[] = [];
 
 // I 4 Giocatori Ufficiali di Default
 export const DEFAULT_PLAYERS: Player[] = [
@@ -409,7 +403,7 @@ export const DEFAULT_PLAYERS: Player[] = [
     losses: 0,
     currentStreak: 0,
     catchphrase: 'Non guardo il punteggio, guardo lo stile!',
-    tags: ['⚡ Re della Schiacciata', '🔥 Macchina da Punti'],
+    tags: [],
     celebrationGifUrl: 'https://media.giphy.com/media/r1IMdmkhUcpUXEYOtY/giphy.gif', // CR7 SIUUU
     profileBanner: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?w=800&auto=format&fit=crop&q=60',
     highestElo: 1200,
@@ -427,7 +421,7 @@ export const DEFAULT_PLAYERS: Player[] = [
     losses: 0,
     currentStreak: 0,
     catchphrase: 'Io non perdo: o vinco o imparo (oggi imparo)!',
-    tags: ['🛡️ Il Muro Umano', '🧘 Maestro Zen'],
+    tags: [],
     celebrationGifUrl: 'https://media.giphy.com/media/g9582DNuQppxC/giphy.gif', // DiCaprio toast
     profileBanner: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&auto=format&fit=crop&q=60',
     highestElo: 1200,
@@ -445,7 +439,7 @@ export const DEFAULT_PLAYERS: Player[] = [
     losses: 0,
     currentStreak: 0,
     catchphrase: 'Quella palla ha toccato lo spigolo, l\'ho sentito!',
-    tags: ['🎲 Fa Solo Spigoli', '🌪️ Topspin Fantasma'],
+    tags: [],
     celebrationGifUrl: 'https://media.giphy.com/media/DhstvI3CH03y8/giphy.gif', // Fire dance
     profileBanner: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=800&auto=format&fit=crop&q=60',
     highestElo: 1200,
@@ -463,7 +457,7 @@ export const DEFAULT_PLAYERS: Player[] = [
     losses: 0,
     currentStreak: 0,
     catchphrase: 'La racchetta è rovinata, compratene una nuova!',
-    tags: ['😭 Scuse Infinite', '🧤 Mano di Burro'],
+    tags: [],
     celebrationGifUrl: 'https://media.giphy.com/media/mlvseq9yvZhba/giphy.gif', // Cat pingpong
     profileBanner: 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&auto=format&fit=crop&q=60',
     highestElo: 1200,

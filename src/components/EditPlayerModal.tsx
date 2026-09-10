@@ -15,7 +15,7 @@ import { Colors } from '../theme/colors';
 import { GifPickerModal } from './GifPickerModal';
 import { useElo } from '../context/EloContext';
 import { SHOP_ITEMS } from '../core/shop';
-import { ACHIEVEMENTS } from '../core/achievements';
+import { ACHIEVEMENTS, getValidPlayerRecognitions } from '../core/achievements';
 
 interface EditPlayerModalProps {
   player: Player | null;
@@ -43,7 +43,7 @@ export const EditPlayerModal: React.FC<EditPlayerModalProps> = ({
   onClose,
   onSave,
 }) => {
-  const { customTags, addCustomTag, removeCustomTag, isAdmin, associatedPlayer } = useElo();
+  const { isAdmin, associatedPlayer } = useElo();
 
   const isOwner = associatedPlayer?.id === player?.id;
   const canEdit = isOwner || isAdmin;
@@ -67,7 +67,9 @@ export const EditPlayerModal: React.FC<EditPlayerModalProps> = ({
       setAvatar(player.avatar);
       setColor(player.color || '#3B82F6');
       setCatchphrase(player.catchphrase || '');
-      setSelectedTags(player.tags || []);
+      // Mantiene solo i tag legittimamente guadagnati o acquistati
+      const validLabels = getValidPlayerRecognitions(player);
+      setSelectedTags((player.tags || []).filter((t) => validLabels.includes(t)));
       setCelebrationGif(player.celebrationGifUrl || '');
       setProfileBanner(player.profileBanner || '');
     }
@@ -75,7 +77,7 @@ export const EditPlayerModal: React.FC<EditPlayerModalProps> = ({
 
   const ownedRecognitions = React.useMemo(() => {
     if (!player) return [];
-    const list: { id: string; label: string; icon: string; type: 'title' | 'trophy' | 'achievement' }[] = [];
+    const list: { id: string; label: string; icon: string; type: 'title' | 'trophy' | 'achievement' | 'custom' }[] = [];
 
     // Titoli acquistati al Bazar
     SHOP_ITEMS.filter((it) => it.category === 'title' && player.inventory?.includes(it.id)).forEach((it) => {
@@ -88,11 +90,11 @@ export const EditPlayerModal: React.FC<EditPlayerModalProps> = ({
     });
 
     // Badge speciali vinti (es. Pacco Sorpresa)
-    if (player.tags?.includes('📦 Spacchettatore Seriale')) {
+    if (player.inventory?.includes('badge_box')) {
       list.push({ id: 'badge_box', label: '📦 Spacchettatore Seriale', icon: '📦', type: 'achievement' });
     }
 
-    // Achievement riscattati dal giocatore
+    // Achievement riscattati dal giocatore (con badge di livello)
     if (player.claimedAchievements) {
       Object.entries(player.claimedAchievements).forEach(([achId, tierLevel]) => {
         const ach = ACHIEVEMENTS.find((a) => a.id === achId);
@@ -108,12 +110,12 @@ export const EditPlayerModal: React.FC<EditPlayerModalProps> = ({
       });
     }
 
-    // Mantieni eventuali tag già salvati sul profilo del giocatore
-    player.tags?.forEach((tag) => {
-      if (!list.some((item) => item.label === tag)) {
-        list.push({ id: tag, label: tag, icon: '🏷️', type: 'achievement' });
-      }
-    });
+    // Tag personalizzati legittimamente coniati tramite gettone del Bazar
+    if (player.coinedTags && Array.isArray(player.coinedTags)) {
+      player.coinedTags.forEach((ct, idx) => {
+        list.push({ id: `coined_${idx}`, label: ct, icon: '🏷️', type: 'custom' });
+      });
+    }
 
     return list;
   }, [player]);
@@ -130,32 +132,38 @@ export const EditPlayerModal: React.FC<EditPlayerModalProps> = ({
 
   const handleAddNewTag = async () => {
     const trimmed = customTagInput.trim();
-    if (!trimmed) return;
+    if (!trimmed || !player) return;
     const fullTag = `${selectedTagEmoji} ${trimmed}`;
-    
-    // Add to shared customTags pool
-    await addCustomTag(selectedTagEmoji, trimmed);
-    
-    // Also select it for this player
-    if (!selectedTags.includes(fullTag)) {
-      setSelectedTags([...selectedTags, fullTag]);
-    }
-    setCustomTagInput('');
-  };
 
-  const handleDeleteCustomTag = async (tagId: string, fullTagStr: string) => {
-    await removeCustomTag(tagId);
-    setSelectedTags((prev) => prev.filter((t) => t !== fullTagStr));
+    // Aggiungi ai tag coniati dal giocatore
+    const updatedCoined = Array.from(new Set([...(player.coinedTags || []), fullTag]));
+    // Consuma il token se non è admin
+    const updatedInventory = isAdmin && !player.inventory?.includes('perk_custom_nickname')
+      ? player.inventory
+      : (player.inventory || []).filter((id) => id !== 'perk_custom_nickname');
+
+    onSave(player.id, {
+      coinedTags: updatedCoined,
+      inventory: updatedInventory,
+      tags: Array.from(new Set([...selectedTags, fullTag])),
+    });
+
+    setSelectedTags((prev) => Array.from(new Set([...prev, fullTag])));
+    setCustomTagInput('');
   };
 
   const handleSave = () => {
     if (!player) return;
+    const validRecognitions = getValidPlayerRecognitions(player);
+    const validSelected = selectedTags.filter(
+      (t) => validRecognitions.includes(t) || (player.coinedTags || []).includes(t)
+    );
     onSave(player.id, {
       name: name.trim() || player.name,
       avatar,
       color,
       catchphrase: catchphrase.trim(),
-      tags: Array.from(new Set(selectedTags)),
+      tags: Array.from(new Set(validSelected)),
       celebrationGifUrl: celebrationGif.trim(),
       profileBanner: profileBanner.trim(),
     });
@@ -354,44 +362,7 @@ export const EditPlayerModal: React.FC<EditPlayerModalProps> = ({
               </View>
             )}
 
-            {/* Tag Personalizzati della Lega */}
-            <Text style={styles.label}>Tag Personalizzati della Lega</Text>
-            {customTags.length === 0 ? (
-              <Text style={styles.emptyTagsText}>Nessun tag personalizzato creato.</Text>
-            ) : (
-              <View style={styles.tagsContainer}>
-                {customTags.map((cTag) => {
-                  const fullStr = `${cTag.emoji} ${cTag.text}`;
-                  const isSelected = selectedTags.includes(fullStr);
-                  return (
-                    <View
-                      key={cTag.id}
-                      style={[styles.customTagPillWrapper, isSelected && styles.customTagPillWrapperSelected]}
-                    >
-                      <TouchableOpacity
-                        onPress={() => toggleTag(fullStr)}
-                        style={styles.customTagPillBtn}
-                      >
-                        <Text style={[styles.tagPillText, isSelected && styles.tagPillTextSelected]}>
-                          {fullStr}
-                        </Text>
-                      </TouchableOpacity>
-                      {isAdmin && (
-                        <TouchableOpacity
-                          onPress={() => handleDeleteCustomTag(cTag.id, fullStr)}
-                          style={styles.deleteTagBtn}
-                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        >
-                          <Text style={styles.deleteTagBtnText}>✕</Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  );
-                })}
-              </View>
-            )}
-
-            {/* Crea & Aggiungi Nuovo Tag alla Lega (Gated by Perk) */}
+            {/* Conio Soprannome Personale (Gated by Perk) */}
             <Text style={styles.label}>Conio Soprannome Personale</Text>
             {hasCustomNicknamePerk ? (
               <>

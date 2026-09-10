@@ -18,7 +18,7 @@ import {
     validateBetPlacement,
 } from '../betting';
 import { openMysteryBox, SHOP_ITEMS, spinLuckyWheel, WHEEL_SECTORS } from '../shop';
-import { calculatePlayerAchievements, ACHIEVEMENTS } from '../achievements';
+import { calculatePlayerAchievements, ACHIEVEMENTS, getValidPlayerRecognitions, sanitizePlayerTags } from '../achievements';
 import { sanitizePlayerUpdates } from '../security';
 import { calculateSpecialTrophies, getPlayerTrophies } from '../trophies';
 import { LiveBet, Match, Player } from '../types';
@@ -429,9 +429,39 @@ function runTests() {
   const wheelSpin = spinLuckyWheel();
   console.assert(wheelSpin.sector.index >= 0 && wheelSpin.sector.index < WHEEL_SECTORS.length, 'Test 21a Fallito: indice settore ruota non valido');
   console.assert(wheelSpin.sector.label.length > 0, 'Test 21b Fallito: label outcome vuota');
-  console.log(`✓ Test 21 Superato: Ruota della fortuna gira con successo -> estrazione "${wheelSpin.sector.label}"`);
+  // Test 22: Rigorosa Meritocrazia dei Tag & Rimozione Tag Autoassegnati
+  const playerWithFraudTags: Player = {
+    id: 'p_fraud',
+    name: 'Truffaldino',
+    inventory: ['title_wall', 'trophy_goat_statue'],
+    claimedAchievements: {
+      win_streak: 1, // Livello 1: Legno 🪵
+    },
+    coinedTags: ['🏷️ Coniato col Gettone'],
+    tags: [
+      '👑 Campione del Mondo (autoprocl', // NON guadagnato -> deve essere rimosso!
+      '🌪️ Topspin Fantasma', // NON guadagnato -> deve essere rimosso!
+      '🧱 Muro di Gomma', // Guadagnato (title_wall) -> deve rimanere
+      '🐐 Il G.O.A.T.', // Guadagnato (trophy_goat_statue) -> deve rimanere
+      '🪵 Inarrestabile (Legno)', // Guadagnato (claimedAchievements win_streak) -> deve rimanere
+      '🏷️ Coniato col Gettone', // Guadagnato (coinedTags) -> deve rimanere
+    ],
+  } as unknown as Player;
 
-  console.log('\nTUTTI I 21 TEST AVANZATI SUPERATI CON SUCCESSO! 🎉');
+  const validRecs = getValidPlayerRecognitions(playerWithFraudTags);
+  console.assert(validRecs.includes('🧱 Muro di Gomma'), 'Test 22a Fallito: Muro di Gomma deve essere valido');
+  console.assert(validRecs.includes('🐐 Il G.O.A.T.'), 'Test 22b Fallito: GOAT deve essere valido');
+  console.assert(validRecs.includes('🪵 Inarrestabile (Legno)'), 'Test 22c Fallito: Inarrestabile Legno deve essere valido');
+  console.assert(validRecs.includes('🏷️ Coniato col Gettone'), 'Test 22d Fallito: Tag coniato deve essere valido');
+  console.assert(!validRecs.includes('👑 Campione del Mondo (autoprocl'), 'Test 22e Fallito: Tag autoproclamato non deve essere valido');
+
+  const sanitizedTags = sanitizePlayerTags(playerWithFraudTags);
+  console.assert(sanitizedTags.length === 4, `Test 22f Fallito: attesi 4 tag legittimi, trovati ${sanitizedTags.length}`);
+  console.assert(!sanitizedTags.includes('👑 Campione del Mondo (autoprocl'), 'Test 22g Fallito: Campione autoproclamato non rimosso');
+  console.assert(!sanitizedTags.includes('🌪️ Topspin Fantasma'), 'Test 22h Fallito: Topspin Fantasma non rimosso');
+  console.log('✓ Test 22 Superato: Rigorosa meritocrazia dei tag & rimozione categorica tag autoassegnati');
+
+  console.log('\nTUTTI I 22 TEST AVANZATI SUPERATI CON SUCCESSO! 🎉');
 }
 
 runTests();
