@@ -27,7 +27,7 @@ import {
 } from './constants';
 import { firebaseConfig, isFirebaseConfigured } from './firebaseConfig';
 import { hashPassword } from './security';
-import { AuthUserProfile, CustomTag, League, Match, Player, ReportSubmission, Season } from './types';
+import { AuthUserProfile, CustomTag, League, Match, MatchBackupRecord, Player, ReportSubmission, Season } from './types';
 
 let app: any = null;
 let db: any = null;
@@ -615,3 +615,39 @@ export async function syncStateToCloud(
     return false;
   }
 }
+
+/**
+ * Salva una copia di backup immutabile (audit log) di una partita nel vault Firestore (match_backups)
+ */
+export async function saveMatchBackup(backup: MatchBackupRecord): Promise<boolean> {
+  if (!db || !isFirebaseConfigured()) return false;
+  try {
+    const backupRef = doc(db, 'match_backups', backup.id);
+    await setDoc(backupRef, sanitizeForFirestore({
+      ...backup,
+      backupSavedAt: Date.now(),
+    }));
+    return true;
+  } catch (err) {
+    console.error('Errore salvataggio backup partita:', err);
+    return false;
+  }
+}
+
+/**
+ * Recupera l'elenco di tutte le partite salvate nel vault di backup (completate o annullate)
+ */
+export async function fetchMatchBackups(leagueId?: string): Promise<MatchBackupRecord[]> {
+  if (!db || !isFirebaseConfigured()) return [];
+  try {
+    const colRef = collection(db, 'match_backups');
+    const q = leagueId ? query(colRef, where('leagueId', '==', leagueId)) : colRef;
+    const snap = await getDocs(q);
+    const list = snap.docs.map((d) => d.data() as MatchBackupRecord);
+    return list.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+  } catch (err) {
+    console.error('Errore recupero backup partite:', err);
+    return [];
+  }
+}
+

@@ -74,6 +74,7 @@ function MainApp() {
     closeLiveReferee,
     liveRefereeConfig,
     startLiveReferee,
+    joinLiveMatchAsSpectator,
     recordMatch,
     currentLeague,
     associatedPlayer,
@@ -208,7 +209,11 @@ function MainApp() {
           activeOpacity={0.85}
           onPress={() => {
             soundEffects.playButtonTap();
-            startLiveReferee(liveP1, liveP2, liveMatch.targetPoints || 11);
+            if (liveMatch.refereeUid && liveMatch.refereeUid !== currentUser?.uid) {
+              joinLiveMatchAsSpectator(liveP1, liveP2, liveMatch.targetPoints || 11);
+            } else {
+              startLiveReferee(liveP1, liveP2, liveMatch.targetPoints || 11);
+            }
           }}
         >
           <View style={styles.liveSpectatorLeft}>

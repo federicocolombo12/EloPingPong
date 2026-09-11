@@ -328,4 +328,51 @@ export interface ReportSubmission {
   notes?: string;
 }
 
+export interface MatchBackupRecord {
+  id: string; // e.g. "backup_comp_matchId_timestamp" or "backup_cancel_liveId_timestamp"
+  matchId: string;
+  leagueId: string;
+  timestamp: number;
+  createdAt?: number;
+  backupSavedAt: number;
+  status: 'completed' | 'cancelled';
+  player1Id: string;
+  player1Name?: string;
+  player2Id: string;
+  player2Name?: string;
+  score1: number;
+  score2: number;
+  winnerId?: string;
+  winnerName?: string;
+  loserId?: string;
+  loserName?: string;
+  eloDelta?: number;
+  eloChange?: number;
+  winnerEloDelta?: number;
+  loserEloDelta?: number;
+  p1EloBefore?: number;
+  p1EloAfter?: number;
+  p2EloBefore?: number;
+  p2EloAfter?: number;
+  isFriendly?: boolean;
+  isLiveMatch?: boolean;
+  environmentalModifiers?: string[];
+  player1Modifiers?: string[];
+  player2Modifiers?: string[];
+  stats?: MatchLiveStats;
+  bets?: Record<string, any>;
+  comments?: MatchComment[];
+  reactions?: Record<string, any>;
+  cancelledAt?: number;
+  cancelledByUid?: string;
+  cancelledByName?: string;
+  refereeUid?: string;
+  refereeName?: string;
+  refereePlayerName?: string;
+  targetPoints?: number;
+  cancellationReason?: string;
+  rawPayload?: any;
+}
+
+
 

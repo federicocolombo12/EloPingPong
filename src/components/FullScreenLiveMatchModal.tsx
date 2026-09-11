@@ -337,6 +337,20 @@ export const FullScreenLiveMatchModal: React.FC<FullScreenLiveMatchModalProps> =
   const isGuardia = !activeLive?.refereeUid || activeLive.refereeUid === currentUser?.uid;
   const guardiaName = activeLive?.refereePlayerName || 'Guardia';
 
+  // Evizione automatica immediata per gli spettatori se la Guardia termina o annulla il match
+  const hadActiveMatchRef = useRef(false);
+  useEffect(() => {
+    if (activeLive) {
+      hadActiveMatchRef.current = true;
+    }
+  }, [activeLive]);
+
+  useEffect(() => {
+    if (visible && hadActiveMatchRef.current && !activeLive) {
+      onClose({ forceCancelMatch: false });
+    }
+  }, [visible, activeLive, onClose]);
+
   // Sincronizzazione in tempo reale delle reazioni fluttuanti ricevute da tutti i client
   useEffect(() => {
     const rec = currentLeague?.activeLiveMatch?.recentReaction;

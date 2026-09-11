@@ -51,6 +51,8 @@ import {
     subscribeToAuth,
     subscribeToLeagueData,
     syncLeagueToCloud,
+    saveMatchBackup,
+    fetchMatchBackups,
     wipeOldMockData,
 } from '../core/firebaseService';
 import {
@@ -74,6 +76,7 @@ import {
     LiveBet,
     LiveMatchSpecialEvent,
     Match,
+    MatchBackupRecord,
     MatchComment,
     MatchLiveStats,
     Player,
@@ -96,6 +99,7 @@ interface EloContextType {
   clearThresholdEvent: () => void;
   toastNotification: ToastData | null;
   clearToastNotification: () => void;
+  setToastNotification: (toast: ToastData | null) => void;
   activeCommentsMatch: Match | null;
   setActiveCommentsMatch: (match: Match | null) => void;
 
@@ -184,6 +188,7 @@ interface EloContextType {
   resetAllData: () => Promise<void>;
   addReaction: (matchId: string, emoji: string, playerId: string) => Promise<void>;
   addComment: (matchId: string, playerId: string, text: string, gifUrl?: string) => Promise<void>;
+  getMatchBackups: (leagueId?: string) => Promise<MatchBackupRecord[]>;
 
   // LUL Coins & Riunione Bet
   placeLiveBet: (
@@ -243,6 +248,7 @@ export const EloProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const activeLeagueIdRef = useRef<string>('');
   const unsubscribeLeagueRef = useRef<(() => void) | null>(null);
   const isSavingMatchRef = useRef<boolean>(false);
+  const isSpectatorRef = useRef<boolean>(false);
 
   // Giocatore associato all'utente loggato
   const associatedPlayer = useMemo(() => {
@@ -271,6 +277,19 @@ export const EloProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     unsubscribeLeagueRef.current = subscribeToLeagueData(leagueId, (cloudLeague) => {
       setCurrentLeague(cloudLeague);
       setCustomTags(cloudLeague.customTags || DEFAULT_CUSTOM_TAGS);
+
+      // Se il match live sul cloud è concluso o rimosso dall'arbitro (activeLiveMatch non esiste più)
+      // e questo dispositivo era aperto come spettatore, caccia via lo spettatore all'istante per evitare bug!
+      if (!cloudLeague.activeLiveMatch && isSpectatorRef.current) {
+        setIsLiveRefereeOpen(false);
+        setLiveRefereeConfig(null);
+        isSpectatorRef.current = false;
+        soundEffects.playButtonTap();
+        setToastNotification({
+          title: '🏁 Partita Live Conclusa',
+          message: "L'arbitro ha terminato o annullato la partita.",
+        });
+      }
 
       // Notifica se è arrivato un nuovo match da un altro dispositivo
       if (prevMatchesLengthRef.current > 0 && cloudLeague.matches.length > prevMatchesLengthRef.current) {
@@ -800,6 +819,7 @@ export const EloProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     target: 11 | 21,
     initialServer: 1 | 2 = 1
   ) => {
+    isSpectatorRef.current = false;
     setLiveRefereeConfig({ player1: p1, player2: p2, targetPoints: target });
     setIsLiveRefereeOpen(true);
 
@@ -844,6 +864,7 @@ export const EloProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const joinLiveMatchAsSpectator = (p1: Player, p2: Player, target: 11 | 21) => {
+    isSpectatorRef.current = true;
     setLiveRefereeConfig({ player1: p1, player2: p2, targetPoints: target });
     setIsLiveRefereeOpen(true);
   };
@@ -943,10 +964,41 @@ export const EloProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const closeLiveReferee = async (options?: { forceCancelMatch?: boolean }) => {
+    isSpectatorRef.current = false;
     setIsLiveRefereeOpen(false);
     setLiveRefereeConfig(null);
     if (options?.forceCancelMatch && currentLeague?.activeLiveMatch) {
       const live = currentLeague.activeLiveMatch;
+
+      // Salvataggio sicuro nel Vault dei Backup per match annullato
+      try {
+        await saveMatchBackup({
+          id: `backup_cancel_${live.id}_${Date.now()}`,
+          matchId: live.id,
+          leagueId: currentLeague.id,
+          timestamp: Date.now(),
+          backupSavedAt: Date.now(),
+          createdAt: Date.now(),
+          status: 'cancelled',
+          player1Id: live.player1Id,
+          player2Id: live.player2Id,
+          score1: live.score1,
+          score2: live.score2,
+          targetPoints: live.targetPoints,
+          refereeUid: live.refereeUid,
+          refereePlayerName: live.refereePlayerName,
+          cancelledByUid: currentUser?.uid,
+          cancelledAt: Date.now(),
+          stats: live.stats,
+          bets: live.bets,
+          comments: live.comments,
+          reactions: live.reactions,
+          rawPayload: live,
+        });
+      } catch (err) {
+        console.error('Errore durante il salvataggio del backup annullato:', err);
+      }
+
       let updatedPlayers = [...players];
 
       // Rimborso automatico scommesse su annullamento match
@@ -1896,6 +1948,47 @@ export const EloProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
       setCurrentLeague(updatedLeague);
       await syncLeagueToCloud(updatedLeague);
+
+      // Salva snapshot immutabile di backup nel Vault
+      try {
+        await saveMatchBackup({
+          id: `backup_comp_${newMatch.id}_${Date.now()}`,
+          matchId: newMatch.id,
+          leagueId: currentLeague.id,
+          timestamp: newMatch.timestamp,
+          createdAt: newMatch.timestamp,
+          backupSavedAt: Date.now(),
+          status: 'completed',
+          player1Id: newMatch.player1Id,
+          player2Id: newMatch.player2Id,
+          score1: newMatch.score1,
+          score2: newMatch.score2,
+          winnerId: newMatch.winnerId,
+          loserId: newMatch.loserId,
+          eloDelta: newMatch.eloDelta,
+          eloChange: newMatch.eloDelta,
+          winnerEloDelta: newMatch.winnerEloDelta,
+          loserEloDelta: newMatch.loserEloDelta,
+          p1EloBefore: newMatch.player1EloBefore,
+          p1EloAfter: newMatch.player1EloAfter,
+          p2EloBefore: newMatch.player2EloBefore,
+          p2EloAfter: newMatch.player2EloAfter,
+          isFriendly: newMatch.isFriendly,
+          environmentalModifiers: newMatch.environmentalModifiers,
+          player1Modifiers: newMatch.player1Modifiers,
+          player2Modifiers: newMatch.player2Modifiers,
+          stats: newMatch.stats,
+          comments: newMatch.comments,
+          reactions: newMatch.reactions,
+          bets: currentLeague.activeLiveMatch?.bets,
+          refereeUid: currentLeague.activeLiveMatch?.refereeUid,
+          refereePlayerName: currentLeague.activeLiveMatch?.refereePlayerName,
+          targetPoints: currentLeague.activeLiveMatch?.targetPoints || (score1 >= 20 || score2 >= 20 ? 21 : 11),
+          rawPayload: newMatch,
+        });
+      } catch (err) {
+        console.error('Errore durante il salvataggio del backup completato:', err);
+      }
     }
 
     // Suona l'inno di vittoria equipaggiato dal vincitore!
@@ -2197,6 +2290,11 @@ export const EloProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const getMatchBackups = async (leagueId?: string): Promise<MatchBackupRecord[]> => {
+    const targetLg = leagueId || currentLeague?.id;
+    return await fetchMatchBackups(targetLg);
+  };
+
   const clearCelebration = () => setCelebrationMatch(null);
   const clearThresholdEvent = () => setThresholdEvent(null);
   const clearToastNotification = () => setToastNotification(null);
@@ -2217,6 +2315,7 @@ export const EloProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         clearThresholdEvent,
         toastNotification,
         clearToastNotification,
+        setToastNotification,
         activeCommentsMatch,
         setActiveCommentsMatch,
 
@@ -2266,6 +2365,7 @@ export const EloProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         resetAllData,
         addReaction,
         addComment,
+        getMatchBackups,
 
         // LUL Coins & Riunione Bet
         placeLiveBet,

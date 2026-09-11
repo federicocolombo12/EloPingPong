@@ -17,6 +17,7 @@ import { Colors } from '../theme/colors';
 import { soundEffects } from '../utils/soundEffects';
 import { ChangelogModal, CURRENT_APP_VERSION } from './ChangelogModal';
 import { EditPlayerModal } from './EditPlayerModal';
+import { MatchBackupVaultModal } from './MatchBackupVaultModal';
 
 interface UserProfileModalProps {
   visible: boolean;
@@ -46,6 +47,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isChangelogOpen, setIsChangelogOpen] = useState(false);
+  const [isVaultOpen, setIsVaultOpen] = useState(false);
 
   const coins = associatedPlayer?.coins !== undefined ? associatedPlayer.coins : STARTING_COINS;
   const milestone = associatedPlayer ? getPlayerActiveMilestone(associatedPlayer.elo) : null;
@@ -290,6 +292,18 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               <View style={styles.adminSection}>
                 <Text style={styles.adminSectionTitle}>👑 Strumenti Capo Riunione (Admin)</Text>
 
+                {/* Vault Backup Partite */}
+                <TouchableOpacity
+                  onPress={() => {
+                    soundEffects.playButtonTap();
+                    setIsVaultOpen(true);
+                  }}
+                  style={styles.adminVaultBtn}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.adminBtnText}>🛡️ Vault Backup Partite (Audit Log & Storico)</Text>
+                </TouchableOpacity>
+
                 {/* Reset Soldi Separato */}
                 <TouchableOpacity
                   onPress={handleResetCoins}
@@ -340,6 +354,12 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
           <ChangelogModal
             visible={isChangelogOpen}
             onClose={() => setIsChangelogOpen(false)}
+          />
+
+          {/* Match Backup Vault Modal */}
+          <MatchBackupVaultModal
+            visible={isVaultOpen}
+            onClose={() => setIsVaultOpen(false)}
           />
         </View>
       </View>
@@ -608,6 +628,14 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '900',
     marginBottom: 4,
+  },
+  adminVaultBtn: {
+    backgroundColor: 'rgba(99, 102, 241, 0.15)',
+    borderColor: '#6366F1',
+    borderWidth: 1,
+    paddingVertical: 11,
+    borderRadius: 10,
+    alignItems: 'center',
   },
   adminResetCoinsBtn: {
     backgroundColor: 'rgba(250, 204, 21, 0.15)',
