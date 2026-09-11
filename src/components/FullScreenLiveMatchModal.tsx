@@ -980,7 +980,7 @@ export const FullScreenLiveMatchModal: React.FC<FullScreenLiveMatchModalProps> =
         player2TotalServes: p2TotalServes,
         targetPoints,
       },
-      [],
+      localComments,
       {}
     );
   };

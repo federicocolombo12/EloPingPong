@@ -175,6 +175,7 @@ interface EloContextType {
       stats?: MatchLiveStats;
       comments?: MatchComment[];
       reactions?: Record<string, string[]>;
+      isLiveMatch?: boolean;
     }
   ) => Promise<{ success: boolean; match?: Match; error?: string }>;
   undoLastMatch: () => Promise<boolean>;
@@ -1626,6 +1627,7 @@ export const EloProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       stats?: MatchLiveStats;
       comments?: MatchComment[];
       reactions?: Record<string, string[]>;
+      isLiveMatch?: boolean;
     } = {}
   ): Promise<{ success: boolean; match?: Match; error?: string }> => {
     // Controllo sicurezza IDOR: utente deve appartenere alla Riunione
@@ -1743,6 +1745,7 @@ export const EloProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       loserEloDelta: eloCalc.loserDelta,
       note: options.note || undefined,
       isFriendly: options.isFriendly,
+      isLiveMatch: options.isLiveMatch !== undefined ? options.isLiveMatch : (!!options.stats || !!currentLeague?.activeLiveMatch),
       environmentalModifiers: options.environmentalModifiers || [],
       player1Modifiers: options.player1Modifiers || [],
       player2Modifiers: options.player2Modifiers || [],

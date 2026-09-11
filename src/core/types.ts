@@ -150,6 +150,7 @@ export interface Match {
   loserEloDelta?: number; // Asymmetric loss for loser
   note?: string;
   isFriendly?: boolean; // If true, delta = 0
+  isLiveMatch?: boolean; // If true, played via Live Referee
   environmentalModifiers?: string[]; // e.g. 'wind', 'dark', 'derby'
   player1Modifiers?: string[]; // e.g. 'borrowed_racket', 'beer'
   player2Modifiers?: string[];

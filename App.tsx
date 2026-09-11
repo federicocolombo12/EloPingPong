@@ -330,17 +330,17 @@ function MainApp() {
         player2={liveRefereeConfig?.player2 || null}
         initialTargetPoints={liveRefereeConfig?.targetPoints || 11}
         onClose={(opts) => closeLiveReferee(opts)}
-        onFinishMatch={(s1, s2, stats, comments, reactions) => {
+        onFinishMatch={async (s1, s2, stats, comments, reactions) => {
           if (liveRefereeConfig?.player1 && liveRefereeConfig?.player2) {
-            recordMatch(
+            await recordMatch(
               liveRefereeConfig.player1.id,
               liveRefereeConfig.player2.id,
               s1,
               s2,
-              { stats, comments, reactions }
+              { stats, comments, reactions, isLiveMatch: true }
             );
           }
-          closeLiveReferee({ forceCancelMatch: true });
+          await closeLiveReferee({ forceCancelMatch: false });
         }}
       />
     </SafeAreaView>
