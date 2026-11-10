@@ -53,14 +53,14 @@ Informal office and club ping pong leagues routinely collapse due to **social co
 
 ## 📱 Visual Walkthrough
 
-### 1. Secret League Onboarding, Podium & Table-Side Live Referee
+### 1. Match Setup & Modifiers, Podium & Table-Side Live Referee
 
 <table>
   <tr>
     <td align="center" width="33%">
-      <img src="docs/media/01_league_gate.png" alt="Secret Meeting Onboarding" width="240" />
-      <br /><strong>Secret League Gate</strong><br />
-      <sub>6-character invite code (<code>SPIN26</code>), player avatar/color builder, and admin season controls (<code>LeagueGateScreen</code>).</sub>
+      <img src="docs/media/01_match_setup.png" alt="Match Setup and Contextual Elo Modifiers" width="240" />
+      <br /><strong>Match Setup &amp; Modifiers</strong><br />
+      <sub>3-step wizard for 11/21-pt rules, official Elo/ATP Race toggle, and asymmetric contextual multipliers (<code>NewMatchScreen</code>).</sub>
     </td>
     <td align="center" width="33%">
       <img src="docs/media/02_leaderboard_podium.png" alt="Leaderboard Podium and Wooden Spoon" width="240" />
