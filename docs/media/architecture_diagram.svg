@@ -1,0 +1,157 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 660" width="1240" height="660">
+  <defs>
+    <filter id="cardShadow" x="-8%" y="-8%" width="116%" height="120%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#000000" flood-opacity="0.45"/>
+    </filter>
+    <marker id="arrowGreen" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+      <path d="M 0 1 L 6 4 L 0 7 z" fill="#10B981"/>
+    </marker>
+    <marker id="arrowCyan" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+      <path d="M 0 1 L 6 4 L 0 7 z" fill="#06B6D4"/>
+    </marker>
+    <marker id="arrowAmber" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+      <path d="M 0 1 L 6 4 L 0 7 z" fill="#F59E0B"/>
+    </marker>
+    <pattern id="bgGrid" width="36" height="36" patternUnits="userSpaceOnUse">
+      <path d="M 36 0 L 0 0 0 36" fill="none" stroke="rgba(148,163,184,0.05)" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <!-- Canvas -->
+  <rect width="1240" height="660" fill="#0B0F17"/>
+  <rect width="1240" height="660" fill="url(#bgGrid)"/>
+
+  <!-- Header -->
+  <text x="44" y="42" fill="#F8FAFC" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="21" font-weight="800" letter-spacing="0.4">ELOPINGPONG ARENA: GAMIFIED UX LOOP &amp; REAL-TIME ARCHITECTURE</text>
+  <text x="44" y="65" fill="#94A3B8" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, monospace" font-size="11.5" font-weight="500">Expo ~57 • React Native 0.86 • TypeScript 6 • Firebase Auth &amp; Firestore • Procedural Web Audio API • Vercel PWA</text>
+
+  <!-- Connectors (drawn behind columns) -->
+  <!-- Col 1 -> Col 2 -->
+  <path d="M 404,220 H 452" fill="none" stroke="#10B981" stroke-width="2" stroke-dasharray="5,4" marker-end="url(#arrowGreen)"/>
+  <text x="428" y="210" fill="#34D399" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" font-weight="700" text-anchor="middle">EVENTS</text>
+
+  <path d="M 404,485 H 452" fill="none" stroke="#10B981" stroke-width="2" stroke-dasharray="5,4" marker-end="url(#arrowGreen)"/>
+  <text x="428" y="475" fill="#34D399" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" font-weight="700" text-anchor="middle">RULES</text>
+
+  <!-- Col 2 <-> Col 3 -->
+  <path d="M 838,230 H 886" fill="none" stroke="#F59E0B" stroke-width="2" stroke-dasharray="5,4" marker-end="url(#arrowAmber)"/>
+  <text x="862" y="220" fill="#FBBF24" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" font-weight="700" text-anchor="middle">WRITE</text>
+
+  <path d="M 886,280 H 838" fill="none" stroke="#06B6D4" stroke-width="2" stroke-dasharray="5,4" marker-end="url(#arrowCyan)"/>
+  <text x="862" y="270" fill="#22D3EE" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" font-weight="700" text-anchor="middle">SYNC</text>
+
+  <path d="M 838,490 H 886" fill="none" stroke="#F59E0B" stroke-width="2" stroke-dasharray="5,4" marker-end="url(#arrowAmber)"/>
+  <text x="862" y="480" fill="#FBBF24" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" font-weight="700" text-anchor="middle">AUDIT</text>
+
+  <!-- COLUMN 1: UX & GAMIFICATION LOOP -->
+  <g transform="translate(44, 92)" filter="url(#cardShadow)">
+    <rect width="360" height="528" rx="12" fill="#111827" stroke="#27354A" stroke-width="1.5"/>
+    <rect width="360" height="38" rx="12" fill="rgba(16, 185, 129, 0.14)"/>
+    <rect y="26" width="360" height="12" fill="rgba(16, 185, 129, 0.14)"/>
+    <line x1="0" y1="38" x2="360" y2="38" stroke="rgba(16, 185, 129, 0.35)" stroke-width="1"/>
+    <text x="16" y="24" fill="#34D399" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11.5" font-weight="700" letter-spacing="0.8">1. SOCIAL COMPETITIVE UX LOOP</text>
+
+    <rect x="16" y="52" width="328" height="96" rx="8" fill="#161F30" stroke="#27354A" stroke-width="1"/>
+    <text x="26" y="72" fill="#F8FAFC" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="12.5" font-weight="700">A. Secret League Gate (LeagueGateScreen)</text>
+    <text x="26" y="90" fill="#94A3B8" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• Frictionless 6-char invite code (e.g. SPIN26)</text>
+    <text x="26" y="106" fill="#94A3B8" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• Season podiums + "Wooden Spoon" anti-tilt comedy</text>
+    <text x="26" y="122" fill="#10B981" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• Dual Ranking: Absolute Elo + Seasonal ATP Race</text>
+    <text x="26" y="138" fill="#64748B" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9.5">Prevents bottom-table drop-off via volume rewards</text>
+
+    <rect x="16" y="160" width="328" height="106" rx="8" fill="#161F30" stroke="#10B981" stroke-width="1.2"/>
+    <text x="26" y="180" fill="#F8FAFC" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="12.5" font-weight="700">B. Table-Side Live Referee (FullScreenModal)</text>
+    <text x="26" y="198" fill="#94A3B8" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• Shared Guard vs Spectator live scoreboard sync</text>
+    <text x="26" y="214" fill="#94A3B8" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• Auto serve rotation, deuce (10-10+), ball contest</text>
+    <text x="26" y="230" fill="#F59E0B" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• 1-Tap Telemetry: Smash, Ace, Defense, Edge, Net</text>
+    <text x="26" y="248" fill="#64748B" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9.5">Eliminates score disputes + powers live odds/awards</text>
+
+    <rect x="16" y="278" width="328" height="108" rx="8" fill="#161F30" stroke="#27354A" stroke-width="1"/>
+    <text x="26" y="298" fill="#F8FAFC" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="12.5" font-weight="700">C. Spectator Economy &amp; Anti-Biscotto</text>
+    <text x="26" y="316" fill="#94A3B8" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• 5 Live Markets: Winner, Points O/U, Smash, Luck, Deuce</text>
+    <text x="26" y="332" fill="#94A3B8" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• Anti-Match-Fixing: Active players bet only on self</text>
+    <text x="26" y="348" fill="#06B6D4" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• WANTED Bounties: Place LUL Coin bounties on rivals</text>
+    <text x="26" y="366" fill="#64748B" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9.5">Keeps sidelined players engaged during every rally</text>
+
+    <rect x="16" y="398" width="328" height="114" rx="8" fill="rgba(245, 158, 11, 0.08)" stroke="rgba(245, 158, 11, 0.45)" stroke-width="1"/>
+    <text x="26" y="418" fill="#FBBF24" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="12" font-weight="700">D. Meritocratic Retention (Bazar &amp; Tiers)</text>
+    <text x="26" y="436" fill="#E2E8F0" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• 8 Retroactive Achievements × 6 Tiers (up to Gear 5)</text>
+    <text x="26" y="452" fill="#E2E8F0" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• Zero Pay-to-Win: Shop sells only cosmetics &amp; perks</text>
+    <text x="26" y="468" fill="#E2E8F0" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• 24h Lucky Wheel + Mystery Box + Daily Bailout</text>
+    <text x="26" y="488" fill="#34D399" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9.5">Strict tag sanitization strips unearned badges</text>
+  </g>
+
+  <!-- COLUMN 2: CLIENT ARCHITECTURE & DOMAIN ENGINES -->
+  <g transform="translate(454, 92)" filter="url(#cardShadow)">
+    <rect width="384" height="528" rx="12" fill="#111827" stroke="#27354A" stroke-width="1.5"/>
+    <rect width="384" height="38" rx="12" fill="rgba(6, 182, 212, 0.14)"/>
+    <rect y="26" width="384" height="12" fill="rgba(6, 182, 212, 0.14)"/>
+    <line x1="0" y1="38" x2="384" y2="38" stroke="rgba(6, 182, 212, 0.35)" stroke-width="1"/>
+    <text x="16" y="24" fill="#22D3EE" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11.5" font-weight="700" letter-spacing="0.8">2. CLIENT STATE &amp; DOMAIN ENGINES</text>
+
+    <rect x="16" y="52" width="352" height="94" rx="8" fill="#161F30" stroke="#06B6D4" stroke-width="1.2"/>
+    <text x="26" y="72" fill="#FFFFFF" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="12.5" font-weight="700">EloContext.tsx — Real-Time Sync Hub</text>
+    <text x="26" y="90" fill="#94A3B8" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• onSnapshot listeners + AsyncStorage local persistence</text>
+    <text x="26" y="106" fill="#94A3B8" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• Spectator auto-eviction &amp; anti-duplicate match guard</text>
+    <text x="26" y="122" fill="#22D3EE" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• Throttled live emoji broadcast + AI Coach stats memo</text>
+    <text x="26" y="137" fill="#64748B" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9.5">Single source of truth across iOS, Android &amp; Web PWA</text>
+
+    <rect x="16" y="158" width="352" height="114" rx="8" fill="#161F30" stroke="#27354A" stroke-width="1"/>
+    <text x="26" y="178" fill="#FFFFFF" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="12.5" font-weight="700">Asymmetric Elo &amp; Race Engine (elo.ts)</text>
+    <text x="26" y="196" fill="#E2E8F0" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10">E_A = 1 / (1 + 10^((R_B - R_A) / 400))</text>
+    <text x="26" y="214" fill="#94A3B8" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• Asymmetric context multipliers (Wind, Borrowed Racket)</text>
+    <text x="26" y="230" fill="#94A3B8" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• 7-day Inactivity Decay (floor 1200) + 15% Rhythm Bonus</text>
+    <text x="26" y="246" fill="#10B981" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• Milestone detector (25-pt steps) -&gt; GIF Celebration</text>
+    <text x="26" y="262" fill="#64748B" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9.5">22 unit assertions verified via npm test (elo.test.ts)</text>
+
+    <rect x="16" y="284" width="352" height="112" rx="8" fill="#161F30" stroke="#27354A" stroke-width="1"/>
+    <text x="26" y="304" fill="#FFFFFF" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="12.5" font-weight="700">Odds, Shop &amp; Security (betting.ts / security.ts)</text>
+    <text x="26" y="322" fill="#94A3B8" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• Dynamic point-weighted odds across 5 live bet markets</text>
+    <text x="26" y="338" fill="#94A3B8" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• Bilateral Anti-Hedging &amp; 2x Booster / Deuce Insurance</text>
+    <text x="26" y="354" fill="#F59E0B" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• Anti-IDOR sanitization strips forbidden Elo/Win edits</text>
+    <text x="26" y="370" fill="#94A3B8" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• SHA-256 credential hashing + ownership validation</text>
+    <text x="26" y="386" fill="#64748B" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9.5">Atomic bet settlement + bounty payout on final whistle</text>
+
+    <rect x="16" y="408" width="352" height="104" rx="8" fill="rgba(6, 182, 212, 0.08)" stroke="rgba(6, 182, 212, 0.38)" stroke-width="1"/>
+    <text x="26" y="428" fill="#22D3EE" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="12" font-weight="700">Procedural Web Audio Synth (soundEffects.ts)</text>
+    <text x="26" y="446" fill="#E2E8F0" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• Zero-latency oscillators + noise buffers (0 audio files)</text>
+    <text x="26" y="462" fill="#E2E8F0" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• Synthesized SFX: Smash, Ace, Edge, Net, Wheel Tick</text>
+    <text x="26" y="478" fill="#E2E8F0" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• Victory Anthems: FFVII Fanfare, Rock, Techno, Stadium</text>
+    <text x="26" y="496" fill="#34D399" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9.5">Works offline on mobile Safari &amp; Chrome without lag</text>
+  </g>
+
+  <!-- COLUMN 3: FIREBASE FIRESTORE & VAULT -->
+  <g transform="translate(888, 92)" filter="url(#cardShadow)">
+    <rect width="308" height="528" rx="12" fill="#111827" stroke="#27354A" stroke-width="1.5"/>
+    <rect width="308" height="38" rx="12" fill="rgba(245, 158, 11, 0.14)"/>
+    <rect y="26" width="308" height="12" fill="rgba(245, 158, 11, 0.14)"/>
+    <line x1="0" y1="38" x2="308" y2="38" stroke="rgba(245, 158, 11, 0.35)" stroke-width="1"/>
+    <text x="16" y="24" fill="#FBBF24" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11.5" font-weight="700" letter-spacing="0.8">3. FIREBASE &amp; AUDIT LAYER</text>
+
+    <rect x="16" y="52" width="276" height="142" rx="8" fill="#161F30" stroke="#F59E0B" stroke-width="1.2"/>
+    <text x="26" y="72" fill="#FFFFFF" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11.5" font-weight="700">/leagues/{leagueId}</text>
+    <text x="26" y="92" fill="#94A3B8" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• players[]: Elo, Race, Coins, Cosmetics</text>
+    <text x="26" y="108" fill="#94A3B8" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• matches[]: Full telemetry &amp; modifiers</text>
+    <text x="26" y="124" fill="#10B981" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• activeLiveMatch: Live score, bets, chat</text>
+    <text x="26" y="140" fill="#94A3B8" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• seasons[]: Archived podiums &amp; Spoons</text>
+    <text x="26" y="156" fill="#94A3B8" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• members{}: UID role ACL enforcement</text>
+    <text x="26" y="176" fill="#64748B" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9.5">Real-time multi-device WebSocket stream</text>
+
+    <rect x="16" y="206" width="276" height="130" rx="8" fill="#161F30" stroke="#27354A" stroke-width="1"/>
+    <text x="26" y="226" fill="#FFFFFF" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11.5" font-weight="700">/users &amp; /accounts</text>
+    <text x="26" y="246" fill="#94A3B8" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• Firebase Auth + hashed fallback sync</text>
+    <text x="26" y="262" fill="#94A3B8" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• Strict 1:1 UID &lt;-&gt; Player binding</text>
+    <text x="26" y="278" fill="#22D3EE" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• firestore.rules: Admin/Member gates</text>
+    <text x="26" y="294" fill="#94A3B8" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• Comment impersonation block</text>
+    <text x="26" y="316" fill="#64748B" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9.5">Prevents unauthorized roster tampering</text>
+
+    <rect x="16" y="348" width="276" height="164" rx="8" fill="rgba(16, 185, 129, 0.08)" stroke="rgba(16, 185, 129, 0.4)" stroke-width="1"/>
+    <text x="26" y="368" fill="#34D399" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11.5" font-weight="700">Audit Vault &amp; Dispute Pipeline</text>
+    <text x="26" y="388" fill="#E2E8F0" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• MatchBackupVaultModal snapshots:</text>
+    <text x="26" y="404" fill="#94A3B8" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10">  Completed &amp; cancelled match payloads</text>
+    <text x="26" y="422" fill="#E2E8F0" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• /reports/{reportId} triage queue:</text>
+    <text x="26" y="438" fill="#94A3B8" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10">  Bug, feature &amp; match_dispute forms</text>
+    <text x="26" y="456" fill="#FBBF24" font-family="ui-sans-serif, -apple-system, sans-serif" font-size="10.5">• Vercel Static PWA Production Host</text>
+    <text x="26" y="472" fill="#94A3B8" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9.5">  elopingpong-arena.vercel.app</text>
+    <text x="26" y="494" fill="#34D399" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9.5">Zero lost matches on mid-game disconnect</text>
+  </g>
+</svg>
